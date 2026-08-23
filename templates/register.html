@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}
+Register - QuizBuzz
+{% endblock %}
+
+{% block content %}
+
+<div class="auth-card">
+
+    <h1>📝 Register</h1>
+
+    <p class="subtitle">
+        QuizBuzz par account banayein
+    </p>
+
+    {% if error %}
+    <div class="error">
+        {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="POST">
+
+        <label>
+            Username
+        </label>
+
+        <input
+            type="text"
+            name="username"
+            placeholder="Username"
+            required
+        >
+
+        <label>
+            Email
+        </label>
+
+        <input
+            type="email"
+            name="email"
+            placeholder="Email"
+            required
+        >
+
+        <label>
+            Mobile Number
+        </label>
+
+        <input
+            type="tel"
+            name="mobile"
+            placeholder="10 digit mobile number"
+            maxlength="10"
+            required
+        >
+
+        <label>
+            Password
+        </label>
+
+        <input
+            type="password"
+            name="password"
+            placeholder="Password"
+            required
+        >
+
+        <button
+            type="submit"
+            class="full-btn"
+        >
+            Register
+        </button>
+
+    </form>
+
+    <p class="auth-bottom">
+
+        Already account hai?
+
+        <a href="{{ url_for('login') }}">
+            Login
+        </a>
+
+    </p>
+
+</div>
+
+{% endblock %}
