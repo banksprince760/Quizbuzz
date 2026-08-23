@@ -23,6 +23,18 @@ Register - QuizBuzz
     <form method="POST">
 
         <label>
+            Full Name
+        </label>
+
+        <input
+            type="text"
+            name="name"
+            placeholder="Apna naam"
+            value="{{ name or '' }}"
+            required
+        >
+
+        <label>
             Username
         </label>
 
@@ -30,6 +42,7 @@ Register - QuizBuzz
             type="text"
             name="username"
             placeholder="Username"
+            value="{{ username or '' }}"
             required
         >
 
@@ -40,7 +53,8 @@ Register - QuizBuzz
         <input
             type="email"
             name="email"
-            placeholder="Email"
+            placeholder="example@gmail.com"
+            value="{{ email or '' }}"
             required
         >
 
@@ -52,7 +66,9 @@ Register - QuizBuzz
             type="tel"
             name="mobile"
             placeholder="10 digit mobile number"
+            value="{{ mobile or '' }}"
             maxlength="10"
+            pattern="[0-9]{10}"
             required
         >
 
@@ -64,6 +80,19 @@ Register - QuizBuzz
             type="password"
             name="password"
             placeholder="Password"
+            minlength="4"
+            required
+        >
+
+        <label>
+            Confirm Password
+        </label>
+
+        <input
+            type="password"
+            name="confirm_password"
+            placeholder="Password dobara enter karein"
+            minlength="4"
             required
         >
 
