@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}
+Home - QuizBuzz
+{% endblock %}
+
+{% block content %}
+
+<div class="hero">
+
+    <h1>⚡ QuizBuzz</h1>
+
+    <h2>
+        Welcome, {{ username }}!
+    </h2>
+
+    <p>
+        Apna category choose karein aur quiz start karein.
+    </p>
+
+</div>
+
+<div class="category-grid">
+
+    {% for key, label in categories.items() %}
+
+    <a
+        href="{{ url_for('exams', category=key) }}"
+        class="category-card"
+    >
+
+        <h2>{{ label }}</h2>
+
+        <p>
+            Quiz start karne ke liye click karein
+        </p>
+
+    </a>
+
+    {% endfor %}
+
+</div>
+
+{% endblock %}
