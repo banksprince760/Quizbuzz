@@ -28,158 +28,61 @@ app = Flask(__name__)
 
 app.secret_key = os.environ.get(
     "SECRET_KEY",
-    "quizapp-secret-key-change-this"
+    "quizbuzz-secret-key-change-this"
 )
 
 
 # ============================================================
-# PATHS / SETTINGS
+# PATHS
 # ============================================================
 
 BASE_DIR = Path(__file__).resolve().parent
 
-QUESTIONS_FILE = BASE_DIR / "static" / "questions.json"
-DATABASE_FILE = BASE_DIR / "quizapp.db"
+QUESTIONS_FILE = BASE_DIR / "questions.json"
 
-TIME_PER_QUESTION = 30
+DATABASE_FILE = BASE_DIR / "quizbuzz.db"
 
+
+# ============================================================
+# QUIZ SETTINGS
+# ============================================================
+
+TIME_PER_QUESTION = 3
+
+QUIZ_LENGTH = 10
+
+
+# ============================================================
+# CATEGORY LABELS
+# ============================================================
 
 CATEGORY_LABELS = {
-    "teaching": "🎓 Teaching",
-    "sports": "🏆 Sports",
-    "music": "🎵 Music",
-    "physical": "🏃 Physical Education",
+    "teaching": "Teaching",
+    "banking": "Banking",
+    "ssc": "SSC",
+    "railway": "Railway",
+    "general": "General Knowledge",
 }
 
 
 # ============================================================
-# DATABASE
+# QUESTIONS
 # ============================================================
 
-def get_db():
-    conn = sqlite3.connect(
-        DATABASE_FILE,
-        timeout=30
-    )
+QUESTIONS = []
 
-    conn.row_factory = sqlite3.Row
-
-    return conn
-
-
-def init_db():
-
-    conn = get_db()
-
-    try:
-
-        cur = conn.cursor()
-
-        # ----------------------------------------------------
-        # USERS
-        # ----------------------------------------------------
-
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT UNIQUE NOT NULL,
-                email TEXT,
-                mobile TEXT,
-                password_hash TEXT NOT NULL,
-                best_score INTEGER NOT NULL DEFAULT 0
-            )
-            """
-        )
-
-        # ----------------------------------------------------
-        # CHECK OLD COLUMNS
-        # ----------------------------------------------------
-
-        existing_columns = {
-            row["name"]
-            for row in cur.execute(
-                "PRAGMA table_info(users)"
-            ).fetchall()
-        }
-
-        if "email" not in existing_columns:
-
-            cur.execute(
-                "ALTER TABLE users ADD COLUMN email TEXT"
-            )
-
-        if "mobile" not in existing_columns:
-
-            cur.execute(
-                "ALTER TABLE users ADD COLUMN mobile TEXT"
-            )
-
-        # ----------------------------------------------------
-        # UNIQUE EMAIL & MOBILE
-        # ----------------------------------------------------
-
-        cur.execute(
-            """
-            CREATE UNIQUE INDEX IF NOT EXISTS
-            idx_users_email
-            ON users(email)
-            WHERE email IS NOT NULL
-            AND email != ''
-            """
-        )
-
-        cur.execute(
-            """
-            CREATE UNIQUE INDEX IF NOT EXISTS
-            idx_users_mobile
-            ON users(mobile)
-            WHERE mobile IS NOT NULL
-            AND mobile != ''
-            """
-        )
-
-        # ----------------------------------------------------
-        # NOTES
-        # ----------------------------------------------------
-
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS notes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                username TEXT NOT NULL,
-                text TEXT NOT NULL,
-                created_at TIMESTAMP
-                    DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(user_id)
-                REFERENCES users(id)
-                ON DELETE CASCADE
-            )
-            """
-        )
-
-        conn.commit()
-
-    finally:
-
-        conn.close()
-
-
-# ============================================================
-# LOAD QUESTIONS
-# ============================================================
 
 def load_questions():
 
+    global QUESTIONS
+
     if not QUESTIONS_FILE.exists():
 
-        print(
-            "Question file not found:",
-            QUESTIONS_FILE
-        )
+        print("WARNING: questions.json not found.")
 
-        return {}
+        QUESTIONS = []
+
+        return
 
     try:
 
@@ -191,143 +94,90 @@ def load_questions():
 
             data = json.load(file)
 
-        if not isinstance(data, dict):
+        if isinstance(data, list):
 
-            print(
-                "Question file error: "
-                "top level must be an object."
-            )
+            QUESTIONS = data
 
-            return {}
+        elif isinstance(data, dict):
+
+            QUESTIONS = []
+
+            for category, values in data.items():
+
+                if isinstance(values, list):
+
+                    for item in values:
+
+                        if isinstance(item, dict):
+
+                            item = dict(item)
+
+                            item.setdefault(
+                                "category",
+                                category
+                            )
+
+                            QUESTIONS.append(item)
+
+        else:
+
+            QUESTIONS = []
 
         print("Questions loaded successfully.")
-
-        return data
 
     except Exception as error:
 
         print(
-            "Question file error:",
+            "Error loading questions:",
             error
         )
 
-        return {}
+        QUESTIONS = []
 
 
-QUESTIONS_DATA = load_questions()
+load_questions()
 
 
 # ============================================================
-# GET EXAMS
+# DATABASE
 # ============================================================
 
-def get_exams_for_category(category):
+def get_db():
 
-    category_data = QUESTIONS_DATA.get(category)
+    connection = sqlite3.connect(
+        DATABASE_FILE
+    )
 
-    if not isinstance(category_data, dict):
+    connection.row_factory = sqlite3.Row
 
-        return {}
+    return connection
 
-    exams = category_data.get("exams")
 
-    if isinstance(exams, dict):
+def init_db():
 
-        return exams
+    connection = get_db()
 
-    return {
-        key: value
-        for key, value in category_data.items()
-        if key not in (
-            "label",
-            "question_bank"
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            best_score INTEGER DEFAULT 0
         )
-    }
-
-
-# ============================================================
-# GET SUBJECT QUESTIONS
-# ============================================================
-
-def get_subject_questions(
-    category,
-    exam,
-    subject
-):
-
-    exams = get_exams_for_category(category)
-
-    exam_data = exams.get(exam)
-
-    if exam_data is None:
-
-        return None
-
-    # --------------------------------------------------------
-    # CASE 1:
-    # Exam ke andar direct questions ki list hai.
-    #
-    # Example:
-    #
-    # Reasoning: [
-    #     {...},
-    #     {...}
-    # ]
-    #
-    # Is case mein subject ka naam exam hi hoga.
-    # --------------------------------------------------------
-
-    if isinstance(exam_data, list):
-
-        if subject == exam:
-
-            return exam_data
-
-        return None
-
-    # --------------------------------------------------------
-    # CASE 2:
-    # Exam ke andar subjects ka dictionary hai.
-    #
-    # Example:
-    #
-    # Exam:
-    #     Reasoning: [...]
-    #     English: [...]
-    #
-    # --------------------------------------------------------
-
-    if isinstance(exam_data, dict):
-
-        questions = exam_data.get(subject)
-
-        if not isinstance(questions, list):
-
-            return None
-
-        return questions
-
-    return None
-
-
-# ============================================================
-# DATABASE INITIALIZATION
-# ============================================================
-
-try:
-
-    init_db()
-
-    print(
-        "Database initialized successfully."
+        """
     )
 
-except Exception as error:
+    connection.commit()
 
-    print(
-        "Database initialization error:",
-        error
-    )
+    connection.close()
+
+    print("Database initialized successfully.")
+
+
+init_db()
 
 
 # ============================================================
@@ -337,9 +187,9 @@ except Exception as error:
 def login_required(function):
 
     @wraps(function)
-    def wrapper(*args, **kwargs):
+    def decorated_function(*args, **kwargs):
 
-        if "user_id" not in session:
+        if not session.get("user_id"):
 
             return redirect(
                 url_for("login")
@@ -347,7 +197,117 @@ def login_required(function):
 
         return function(*args, **kwargs)
 
-    return wrapper
+    return decorated_function
+
+
+# ============================================================
+# QUESTION HELPERS
+# ============================================================
+
+def get_subject_questions(
+    category,
+    exam,
+    subject
+):
+
+    result = []
+
+    for question in QUESTIONS:
+
+        if not isinstance(question, dict):
+
+            continue
+
+        question_category = str(
+            question.get("category", "")
+        ).lower()
+
+        question_exam = str(
+            question.get("exam", "")
+        ).lower()
+
+        question_subject = str(
+            question.get("subject", "")
+        ).lower()
+
+        if (
+            question_category == str(category).lower()
+            and question_exam == str(exam).lower()
+            and question_subject == str(subject).lower()
+        ):
+
+            result.append(question)
+
+    return result
+
+
+# ============================================================
+# SAVE BEST SCORE
+# ============================================================
+
+def save_best_score(score):
+
+    user_id = session.get("user_id")
+
+    if not user_id:
+
+        return
+
+    connection = get_db()
+
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        SELECT best_score
+        FROM users
+        WHERE id = ?
+        """,
+        (user_id,)
+    )
+
+    row = cursor.fetchone()
+
+    if row:
+
+        old_score = row["best_score"] or 0
+
+        if score > old_score:
+
+            cursor.execute(
+                """
+                UPDATE users
+                SET best_score = ?
+                WHERE id = ?
+                """,
+                (
+                    score,
+                    user_id
+                )
+            )
+
+            connection.commit()
+
+    connection.close()
+
+
+# ============================================================
+# HOME
+# ============================================================
+
+@app.route("/")
+def index():
+
+    if not session.get("user_id"):
+
+        return redirect(
+            url_for("login")
+        )
+
+    return render_template(
+        "index.html",
+        categories=CATEGORY_LABELS
+    )
 
 
 # ============================================================
@@ -362,181 +322,81 @@ def register():
 
     if request.method == "POST":
 
-        username = request.form.get(
-            "username",
-            ""
+        username = (
+            request.form.get("username")
+            or ""
         ).strip()
 
-        email = request.form.get(
-            "email",
-            ""
-        ).strip().lower()
-
-        mobile = request.form.get(
-            "mobile",
-            ""
-        ).strip()
-
-        password = request.form.get(
-            "password",
-            ""
+        password = (
+            request.form.get("password")
+            or ""
         )
 
-        if (
-            not username
-            or not email
-            or not mobile
-            or not password
-        ):
+        confirm_password = (
+            request.form.get("confirm_password")
+            or ""
+        )
+
+        if not username or not password:
 
             return render_template(
                 "register.html",
-                error=(
-                    "Sabhi fields bharna "
-                    "zaroori hai."
-                )
+                error="Username aur password required hai."
             )
 
-        if (
-            "@" not in email
-            or "." not in email
-        ):
+        if password != confirm_password:
 
             return render_template(
                 "register.html",
-                error=(
-                    "Please valid email "
-                    "address enter karein."
-                )
+                error="Passwords match nahi kar rahe."
             )
 
-        if (
-            not mobile.isdigit()
-            or len(mobile) != 10
-        ):
+        connection = get_db()
+
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            SELECT id
+            FROM users
+            WHERE username = ?
+            """,
+            (username,)
+        )
+
+        existing_user = cursor.fetchone()
+
+        if existing_user:
+
+            connection.close()
 
             return render_template(
                 "register.html",
-                error=(
-                    "Mobile number 10 digits "
-                    "ka hona chahiye."
-                )
+                error="Username already exist karta hai."
             )
 
-        conn = get_db()
+        hashed_password = generate_password_hash(
+            password
+        )
 
-        try:
-
-            cur = conn.cursor()
-
-            # ------------------------------------------------
-            # USERNAME CHECK
-            # ------------------------------------------------
-
-            cur.execute(
-                """
-                SELECT id
-                FROM users
-                WHERE LOWER(username) = LOWER(?)
-                """,
-                (username,)
+        cursor.execute(
+            """
+            INSERT INTO users (
+                username,
+                password,
+                best_score
             )
-
-            if cur.fetchone():
-
-                return render_template(
-                    "register.html",
-                    error=(
-                        "Ye username pehle se "
-                        "registered hai."
-                    )
-                )
-
-            # ------------------------------------------------
-            # EMAIL CHECK
-            # ------------------------------------------------
-
-            cur.execute(
-                """
-                SELECT id
-                FROM users
-                WHERE LOWER(email) = LOWER(?)
-                """,
-                (email,)
+            VALUES (?, ?, 0)
+            """,
+            (
+                username,
+                hashed_password
             )
+        )
 
-            if cur.fetchone():
+        connection.commit()
 
-                return render_template(
-                    "register.html",
-                    error=(
-                        "Ye email pehle se "
-                        "registered hai."
-                    )
-                )
-
-            # ------------------------------------------------
-            # MOBILE CHECK
-            # ------------------------------------------------
-
-            cur.execute(
-                """
-                SELECT id
-                FROM users
-                WHERE mobile = ?
-                """,
-                (mobile,)
-            )
-
-            if cur.fetchone():
-
-                return render_template(
-                    "register.html",
-                    error=(
-                        "Ye mobile number pehle se "
-                        "registered hai."
-                    )
-                )
-
-            # ------------------------------------------------
-            # INSERT USER
-            # ------------------------------------------------
-
-            cur.execute(
-                """
-                INSERT INTO users(
-                    username,
-                    email,
-                    mobile,
-                    password_hash
-                )
-                VALUES(?, ?, ?, ?)
-                """,
-                (
-                    username,
-                    email,
-                    mobile,
-                    generate_password_hash(
-                        password
-                    )
-                )
-            )
-
-            conn.commit()
-
-        except sqlite3.IntegrityError:
-
-            return render_template(
-                "register.html",
-                error=(
-                    "Email ya mobile number "
-                    "pehle se registered hai."
-                )
-            )
-
-        finally:
-
-            conn.close()
+        connection.close()
 
         return redirect(
             url_for("login")
@@ -559,61 +419,49 @@ def login():
 
     if request.method == "POST":
 
-        username = request.form.get(
-            "username",
-            ""
+        username = (
+            request.form.get("username")
+            or ""
         ).strip()
 
-        password = request.form.get(
-            "password",
-            ""
+        password = (
+            request.form.get("password")
+            or ""
         )
 
-        conn = get_db()
+        connection = get_db()
 
-        try:
+        cursor = connection.cursor()
 
-            cur = conn.cursor()
+        cursor.execute(
+            """
+            SELECT *
+            FROM users
+            WHERE username = ?
+            """,
+            (username,)
+        )
 
-            cur.execute(
-                """
-                SELECT *
-                FROM users
-                WHERE LOWER(username) = LOWER(?)
-                """,
-                (username,)
-            )
+        user = cursor.fetchone()
 
-            user = cur.fetchone()
+        connection.close()
 
-        finally:
-
-            conn.close()
-
-        if (
-            not user
-            or not check_password_hash(
-                user["password_hash"],
-                password
-            )
+        if user and check_password_hash(
+            user["password"],
+            password
         ):
 
-            return render_template(
-                "login.html",
-                error=(
-                    "Galat username "
-                    "ya password."
-                )
+            session["user_id"] = user["id"]
+
+            session["username"] = user["username"]
+
+            return redirect(
+                url_for("index")
             )
 
-        session.clear()
-
-        session["user_id"] = user["id"]
-
-        session["username"] = user["username"]
-
-        return redirect(
-            url_for("index")
+        return render_template(
+            "login.html",
+            error="Username ya password galat hai."
         )
 
     return render_template(
@@ -636,172 +484,79 @@ def logout():
 
 
 # ============================================================
-# HOME
+# NOTES
 # ============================================================
 
-@app.route("/")
+@app.route("/notes")
 @login_required
-def index():
+def notes():
 
     return render_template(
-        "index.html",
-        username=session.get(
-            "username"
-        ),
-        categories=CATEGORY_LABELS
+        "notes.html"
     )
 
 
 # ============================================================
-# EXAMS
+# LEADERBOARD
+# ============================================================
+
+@app.route("/leaderboard")
+@login_required
+def leaderboard():
+
+    connection = get_db()
+
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        SELECT username, best_score
+        FROM users
+        ORDER BY best_score DESC, username ASC
+        """
+    )
+
+    users = cursor.fetchall()
+
+    connection.close()
+
+    return render_template(
+        "leaderboard.html",
+        users=users
+    )
+
+
+# ============================================================
+# START QUIZ
 # ============================================================
 
 @app.route(
-    "/category/<category>"
+    "/start",
+    methods=["POST"]
 )
 @login_required
-def exams(category):
+def start_quiz():
 
-    if category not in QUESTIONS_DATA:
+    category = (
+        request.form.get("category")
+        or ""
+    ).strip()
 
-        abort(404)
+    exam = (
+        request.form.get("exam")
+        or ""
+    ).strip()
 
-    exams_data = get_exams_for_category(
-        category
-    )
+    subject = (
+        request.form.get("subject")
+        or ""
+    ).strip()
 
-    if not exams_data:
-
-        abort(404)
-
-    return render_template(
-        "exams.html",
-        category=category,
-        category_label=CATEGORY_LABELS.get(
-            category,
-            category.title()
-        ),
-        exams=exams_data
-    )
-
-
-# ============================================================
-# SUBJECTS / EXAM
-# ============================================================
-
-@app.route(
-    "/category/<category>/exam/<path:exam>"
-)
-@login_required
-def subjects(
-    category,
-    exam
-):
-
-    if category not in QUESTIONS_DATA:
-
-        abort(404)
-
-    exams_data = get_exams_for_category(
-        category
-    )
-
-    if exam not in exams_data:
-
-        abort(404)
-
-    exam_data = exams_data[exam]
-
-    # --------------------------------------------------------
-    # DIRECT QUESTION LIST
-    #
-    # Example:
-    # Teaching -> Reasoning -> [questions]
-    #
-    # Aise exam mein subjects nahi hain.
-    # Isliye seedha quiz start hoga.
-    # --------------------------------------------------------
-
-    if isinstance(exam_data, list):
-
-        if not exam_data:
-
-            abort(404)
-
-        session["category"] = category
-        session["exam"] = exam
-        session["subject"] = exam
-        session["score"] = 0
-        session["q_index"] = 0
+    if not category or not exam or not subject:
 
         return redirect(
-            url_for("question")
+            url_for("index")
         )
-
-    # --------------------------------------------------------
-    # SUBJECT DICTIONARY
-    # --------------------------------------------------------
-
-    if not isinstance(
-        exam_data,
-        dict
-    ):
-
-        abort(404)
-
-    return render_template(
-        "subjects.html",
-        category=category,
-        category_label=CATEGORY_LABELS.get(
-            category,
-            category.title()
-        ),
-        exam=exam,
-        subjects=exam_data
-    )
-
-
-# ============================================================
-# START TEST
-# ============================================================
-
-@app.route(
-    "/category/<category>/exam/<path:exam>"
-    "/subject/<path:subject>"
-)
-@login_required
-def start_test(
-    category,
-    exam,
-    subject
-):
-
-    if category not in QUESTIONS_DATA:
-
-        abort(404)
-
-    exams_data = get_exams_for_category(
-        category
-    )
-
-    exam_data = exams_data.get(
-        exam
-    )
-
-    if exam_data is None:
-
-        abort(404)
-
-    # --------------------------------------------------------
-    # Normal subject-based exam
-    # --------------------------------------------------------
-
-    if not isinstance(
-        exam_data,
-        dict
-    ):
-
-        abort(404)
 
     questions = get_subject_questions(
         category,
@@ -809,32 +564,25 @@ def start_test(
         subject
     )
 
-    if questions is None:
-
-        abort(404)
-
     if not questions:
 
         return render_template(
-            "subjects.html",
-            category=category,
-            category_label=CATEGORY_LABELS.get(
-                category,
-                category.title()
-            ),
-            exam=exam,
-            subjects=exam_data,
-            error=(
-                "Is subject mein abhi "
-                "questions available nahi hain."
-            )
+            "index.html",
+            categories=CATEGORY_LABELS,
+            error="Is subject ke questions available nahi hain."
         )
 
     session["category"] = category
+
     session["exam"] = exam
+
     session["subject"] = subject
-    session["score"] = 0
+
     session["q_index"] = 0
+
+    session["score"] = 0
+
+    session["last_feedback"] = None
 
     return redirect(
         url_for("question")
@@ -852,41 +600,37 @@ def start_test(
 @login_required
 def question():
 
-    category = session.get(
-        "category"
-    )
+    category = session.get("category")
 
-    exam = session.get(
-        "exam"
-    )
+    exam = session.get("exam")
 
-    subject = session.get(
-        "subject"
-    )
+    subject = session.get("subject")
 
-    if (
-        not category
-        or not exam
-        or not subject
-    ):
+    if not category or not exam or not subject:
 
         return redirect(
             url_for("index")
         )
 
-    quiz = get_subject_questions(
+    all_questions = get_subject_questions(
         category,
         exam,
         subject
     )
 
-    if not quiz:
+    if not all_questions:
 
         session.clear()
 
         return redirect(
             url_for("index")
         )
+
+    # ==========================================
+    # ONLY 10 QUESTIONS
+    # ==========================================
+
+    quiz = all_questions[:QUIZ_LENGTH]
 
     try:
 
@@ -909,9 +653,9 @@ def question():
         q_index
     )
 
-    # --------------------------------------------------------
+    # ==========================================
     # QUIZ FINISHED
-    # --------------------------------------------------------
+    # ==========================================
 
     if q_index >= len(quiz):
 
@@ -934,6 +678,8 @@ def question():
         save_best_score(
             final_score
         )
+
+        total_questions = len(quiz)
 
         session.pop(
             "category",
@@ -968,12 +714,10 @@ def question():
         return render_template(
             "result.html",
             score=final_score,
-            total=len(quiz)
+            total=total_questions
         )
 
-    current_question = quiz[
-        q_index
-    ]
+    current_question = quiz[q_index]
 
     if not isinstance(
         current_question,
@@ -982,9 +726,9 @@ def question():
 
         abort(500)
 
-    # --------------------------------------------------------
+    # ==========================================
     # SUBMIT ANSWER
-    # --------------------------------------------------------
+    # ==========================================
 
     if request.method == "POST":
 
@@ -999,7 +743,8 @@ def question():
         )
 
         is_correct = (
-            selected == correct_answer
+            selected is not None
+            and selected == correct_answer
         )
 
         if is_correct:
@@ -1017,26 +762,21 @@ def question():
 
             "selected": selected,
 
-            "correct_answer":
-                correct_answer
+            "correct_answer": correct_answer
         }
 
+        # Next question
         session["q_index"] = (
             q_index + 1
         )
 
-        return render_template(
-            "answer_feedback.html",
-            feedback=session[
-                "last_feedback"
-            ],
-            q_index=q_index + 1,
-            total=len(quiz)
+        return redirect(
+            url_for("question")
         )
 
-    # --------------------------------------------------------
+    # ==========================================
     # SHOW QUESTION
-    # --------------------------------------------------------
+    # ==========================================
 
     return render_template(
         "question.html",
@@ -1059,7 +799,7 @@ def question():
 
         category_label=CATEGORY_LABELS.get(
             category,
-            ""
+            category
         ),
 
         exam=exam,
@@ -1069,180 +809,15 @@ def question():
 
 
 # ============================================================
-# BEST SCORE
+# RESULT
 # ============================================================
 
-def save_best_score(score):
-
-    if "user_id" not in session:
-
-        return
-
-    conn = get_db()
-
-    try:
-
-        cur = conn.cursor()
-
-        cur.execute(
-            """
-            SELECT best_score
-            FROM users
-            WHERE id = ?
-            """,
-            (
-                session["user_id"],
-            )
-        )
-
-        user = cur.fetchone()
-
-        if (
-            user
-            and score > user["best_score"]
-        ):
-
-            cur.execute(
-                """
-                UPDATE users
-                SET best_score = ?
-                WHERE id = ?
-                """,
-                (
-                    score,
-                    session["user_id"]
-                )
-            )
-
-            conn.commit()
-
-    finally:
-
-        conn.close()
-
-
-# ============================================================
-# NOTES
-# ============================================================
-
-@app.route(
-    "/notes",
-    methods=["GET", "POST"]
-)
+@app.route("/result")
 @login_required
-def notes():
+def result():
 
-    error = None
-
-    if request.method == "POST":
-
-        text = request.form.get(
-            "text",
-            ""
-        ).strip()
-
-        if not text:
-
-            error = (
-                "Note likhna zaroori hai."
-            )
-
-        else:
-
-            conn = get_db()
-
-            try:
-
-                cur = conn.cursor()
-
-                cur.execute(
-                    """
-                    INSERT INTO notes(
-                        user_id,
-                        username,
-                        text
-                    )
-                    VALUES(?, ?, ?)
-                    """,
-                    (
-                        session["user_id"],
-                        session["username"],
-                        text
-                    )
-                )
-
-                conn.commit()
-
-            finally:
-
-                conn.close()
-
-            return redirect(
-                url_for("notes")
-            )
-
-    conn = get_db()
-
-    try:
-
-        cur = conn.cursor()
-
-        cur.execute(
-            """
-            SELECT *
-            FROM notes
-            ORDER BY created_at DESC
-            LIMIT 50
-            """
-        )
-
-        all_notes = cur.fetchall()
-
-    finally:
-
-        conn.close()
-
-    return render_template(
-        "notes.html",
-        notes=all_notes,
-        error=error
-    )
-
-
-# ============================================================
-# LEADERBOARD
-# ============================================================
-
-@app.route(
-    "/leaderboard"
-)
-@login_required
-def leaderboard():
-
-    conn = get_db()
-
-    try:
-
-        cur = conn.cursor()
-
-        cur.execute(
-            """
-            SELECT username, best_score
-            FROM users
-            ORDER BY best_score DESC
-            LIMIT 20
-            """
-        )
-
-        top_users = cur.fetchall()
-
-    finally:
-
-        conn.close()
-
-    return render_template(
-        "leaderboard.html",
-        top_users=top_users
+    return redirect(
+        url_for("index")
     )
 
 
@@ -1255,52 +830,7 @@ def health():
 
     return {
         "status": "ok"
-    }, 200
-
-
-# ============================================================
-# ERROR HANDLERS
-# ============================================================
-
-@app.errorhandler(404)
-def page_not_found(error):
-
-    try:
-
-        return render_template(
-            "error.html",
-            error_code=404,
-            error_message="Page nahi mili."
-        ), 404
-
-    except Exception:
-
-        return (
-            "Page Not Found",
-            404
-        )
-
-
-@app.errorhandler(500)
-def internal_server_error(error):
-
-    try:
-
-        return render_template(
-            "error.html",
-            error_code=500,
-            error_message=(
-                "Server par internal error "
-                "aa gaya. Render logs check karein."
-            )
-        ), 500
-
-    except Exception:
-
-        return (
-            "Internal Server Error",
-            500
-        )
+    }
 
 
 # ============================================================
@@ -1309,13 +839,16 @@ def internal_server_error(error):
 
 if __name__ == "__main__":
 
+    port = int(
+        os.environ.get(
+            "PORT",
+            5000
+        )
+    )
+
     app.run(
         host="0.0.0.0",
-        port=int(
-            os.environ.get(
-                "PORT",
-                5000
-            )
-        ),
+        port=port,
         debug=False
     )
+    
