@@ -11,18 +11,55 @@ Result - QuizBuzz
     <h1>🎉 Quiz Complete!</h1>
 
     <h2>
-        Your Score
+        Your Result
     </h2>
 
     <div class="score">
         {{ score }} / {{ total }}
     </div>
 
+    <p>
+        ✅ Correct Answers:
+        <strong>{{ score }}</strong>
+    </p>
+
+    <p>
+        ❌ Wrong Answers:
+        <strong>{{ total - score }}</strong>
+    </p>
+
+    <p>
+        📊 Percentage:
+        <strong>
+            {{ ((score / total) * 100)|round(0)|int }}%
+        </strong>
+    </p>
+
+    {% if score == total %}
+
+        <h2>🏆 Perfect Score!</h2>
+
+    {% elif score >= total * 0.7 %}
+
+        <h2>🌟 Excellent!</h2>
+
+    {% elif score >= total * 0.5 %}
+
+        <h2>👍 Good Job!</h2>
+
+    {% else %}
+
+        <h2>💪 Keep Practicing!</h2>
+
+    {% endif %}
+
+    <br>
+
     <a
         href="{{ url_for('index') }}"
         class="full-btn"
     >
-        Back to Home
+        🏠 Back to Home
     </a>
 
 </div>
