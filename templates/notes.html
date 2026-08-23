@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}
+Notes - QuizBuzz
+{% endblock %}
+
+{% block content %}
+
+<h1>📝 My Notes</h1>
+
+{% if error %}
+
+<div class="error">
+    {{ error }}
+</div>
+
+{% endif %}
+
+<form method="POST">
+
+    <textarea
+        name="text"
+        placeholder="Apni note yahan likhein..."
+        rows="5"
+        required
+    ></textarea>
+
+    <button
+        type="submit"
+        class="full-btn"
+    >
+        Save Note
+    </button>
+
+</form>
+
+<hr>
+
+{% for note in notes %}
+
+<div class="note-card">
+
+    <p>
+        {{ note["text"] }}
+    </p>
+
+    <small>
+        {{ note["created_at"] }}
+    </small>
+
+</div>
+
+{% else %}
+
+<p>
+    Abhi koi notes nahi hain.
+</p>
+
+{% endfor %}
+
+{% endblock %}
