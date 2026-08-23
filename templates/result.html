@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}
+Result - QuizBuzz
+{% endblock %}
+
+{% block content %}
+
+<div class="quiz-card">
+
+    <h1>🎉 Quiz Complete!</h1>
+
+    <h2>
+        Your Score
+    </h2>
+
+    <div class="score">
+        {{ score }} / {{ total }}
+    </div>
+
+    <a
+        href="{{ url_for('index') }}"
+        class="full-btn"
+    >
+        Back to Home
+    </a>
+
+</div>
+
+{% endblock %}
