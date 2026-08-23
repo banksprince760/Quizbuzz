@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}
+Subjects - QuizBuzz
+{% endblock %}
+
+{% block content %}
+
+<h1>{{ category_label }}</h1>
+
+<h2>
+    {{ exam }}
+</h2>
+
+{% if error %}
+
+<div class="error">
+    {{ error }}
+</div>
+
+{% endif %}
+
+<div class="category-grid">
+
+    {% for subject, questions in subjects.items() %}
+
+    <a
+        href="{{ url_for(
+            'start_test',
+            category=category,
+            exam=exam,
+            subject=subject
+        ) }}"
+        class="category-card"
+    >
+
+        <h2>{{ subject }}</h2>
+
+        {% if questions is sequence %}
+        <p>
+            {{ questions|length }} Questions
+        </p>
+        {% endif %}
+
+    </a>
+
+    {% endfor %}
+
+</div>
+
+{% endblock %}
