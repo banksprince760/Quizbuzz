@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}
+Question {{ q_number }} - QuizBuzz
+{% endblock %}
+
+{% block content %}
+
+<div class="quiz-card">
+
+    <div class="quiz-top">
+
+        <div>
+
+            <p class="eyebrow">
+                {{ category_label }}
+            </p>
+
+            <h2>
+                {{ exam }}
+            </h2>
+
+            <p>
+                {{ subject }}
+            </p>
+
+        </div>
+
+        <div class="timer-box">
+
+            ⏱️
+
+            <span id="timeLeft">
+                {{ time_limit }}
+            </span>
+
+            sec
+
+        </div>
+
+    </div>
+
+    <div class="progress">
+
+        Question
+        {{ q_number }}
+        /
+        {{ total }}
+
+    </div>
+
+    <h2 class="question-text">
+        {{ question }}
+    </h2>
+
+    <form
+        method="POST"
+        id="quizForm"
+    >
+
+        {% for option in options %}
+
+        <label class="option-label">
+
+            <input
+                type="radio"
+                name="option"
+                value="{{ option }}"
+                required
+            >
+
+            <span>
+                {{ option }}
+            </span>
+
+        </label>
+
+        {% endfor %}
+
+        <button
+            type="submit"
+            class="full-btn"
+        >
+            Submit Answer →
+        </button>
+
+    </form>
+
+</div>
+
+<script>
+
+let timeLeft = {{ time_limit }};
+
+const timer =
+    document.getElementById("timeLeft");
+
+const form =
+    document.getElementById("quizForm");
+
+const interval =
+    setInterval(function () {
+
+        timeLeft--;
+
+        timer.textContent = timeLeft;
+
+        if (timeLeft <= 0) {
+
+            clearInterval(interval);
+
+            const input =
+                document.createElement("input");
+
+            input.type = "hidden";
+            input.name = "option";
+            input.value = "";
+
+            form.appendChild(input);
+
+            form.submit();
+
+        }
+
+    }, 1000);
+
+</script>
+
+{% endblock %}
