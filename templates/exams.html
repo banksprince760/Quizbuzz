@@ -1,36 +1,42 @@
 {% extends "base.html" %}
-
 {% block title %}
 {{ category_label }} - QuizBuzz
 {% endblock %}
-
 {% block content %}
-
-<h1>{{ category_label }}</h1>
-
-<p>
-    Exam select karein:
-</p>
-
-<div class="category-grid">
-
-    {% for exam_name, exam_data in exams.items() %}
-
-    <a
-        href="{{ url_for('subjects', category=category, exam=exam_name) }}"
-        class="category-card"
-    >
-
-        <h2>{{ exam_name }}</h2>
-
-        <p>
-            Subjects dekhein
-        </p>
-
-    </a>
-
-    {% endfor %}
-
+<div class="hero">
+    <h1>{{ category_label }}</h1>
+    <p>
+        Exam aur subject choose karein.
+    </p>
 </div>
 
+{% if not exams_subjects %}
+<p>
+    Is category ke liye abhi koi exams available nahi hain.
+</p>
+{% else %}
+<form action="{{ url_for('start_quiz') }}" method="POST">
+    <input type="hidden" name="category" value="{{ category }}">
+
+    <label for="exam">Exam</label>
+    <select name="exam" id="exam" required>
+        {% for exam_name in exams_subjects.keys() %}
+        <option value="{{ exam_name }}">{{ exam_name }}</option>
+        {% endfor %}
+    </select>
+
+    <label for="subject">Subject</label>
+    <select name="subject" id="subject" required>
+        {% for exam_name, subjects in exams_subjects.items() %}
+            {% for subject_name in subjects %}
+            <option value="{{ subject_name }}">{{ subject_name }}</option>
+            {% endfor %}
+        {% endfor %}
+    </select>
+
+    <button type="submit" class="category-card">
+        Start Quiz
+    </button>
+</form>
+{% endif %}
 {% endblock %}
