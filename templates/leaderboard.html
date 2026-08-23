@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}
+Leaderboard - QuizBuzz
+{% endblock %}
+
+{% block content %}
+
+<h1>🏆 Leaderboard</h1>
+
+<div class="leaderboard">
+
+    {% for user in top_users %}
+
+    <div class="leaderboard-row">
+
+        <span>
+            {{ loop.index }}.
+            {{ user["username"] }}
+        </span>
+
+        <strong>
+            {{ user["best_score"] }}
+        </strong>
+
+    </div>
+
+    {% else %}
+
+    <p>
+        Abhi leaderboard empty hai.
+    </p>
+
+    {% endfor %}
+
+</div>
+
+{% endblock %}
