@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}
+Final Result - QuizBuzz
+{% endblock %}
+
+{% block content %}
+
+<div class="result-card">
+
+    <div class="result-icon">
+        🏆
+    </div>
+
+    <h1>
+        Quiz Complete!
+    </h1>
+
+    <p class="score-big">
+        {{ score }} / {{ total }}
+    </p>
+
+    {% if total > 0 %}
+
+    <p class="percentage">
+
+        {{ ((score / total) * 100)|round(1) }}%
+
+    </p>
+
+    {% endif %}
+
+    <div class="result-actions">
+
+        <a
+            href="{{ url_for('index') }}"
+            class="btn"
+        >
+            🏠 Home
+        </a>
+
+        <a
+            href="{{ url_for('leaderboard') }}"
+            class="btn"
+        >
+            🏆 Leaderboard
+        </a>
+
+    </div>
+
+</div>
+
+{% endblock %}
