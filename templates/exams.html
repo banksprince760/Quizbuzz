@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}
+{{ category_label }} - QuizBuzz
+{% endblock %}
+
+{% block content %}
+
+<h1>{{ category_label }}</h1>
+
+<p>
+    Exam select karein:
+</p>
+
+<div class="category-grid">
+
+    {% for exam_name, exam_data in exams.items() %}
+
+    <a
+        href="{{ url_for('subjects', category=category, exam=exam_name) }}"
+        class="category-card"
+    >
+
+        <h2>{{ exam_name }}</h2>
+
+        <p>
+            Subjects dekhein
+        </p>
+
+    </a>
+
+    {% endfor %}
+
+</div>
+
+{% endblock %}
