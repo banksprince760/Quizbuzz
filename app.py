@@ -61,18 +61,24 @@ def get_db():
         DATABASE_FILE,
         timeout=30
     )
+
     conn.row_factory = sqlite3.Row
+
     return conn
 
 
 def init_db():
+
     conn = get_db()
+
     try:
+
         cur = conn.cursor()
 
         # ----------------------------------------------------
         # USERS
         # ----------------------------------------------------
+
         cur.execute(
             """
             CREATE TABLE IF NOT EXISTS users (
@@ -89,6 +95,7 @@ def init_db():
         # ----------------------------------------------------
         # CHECK OLD COLUMNS
         # ----------------------------------------------------
+
         existing_columns = {
             row["name"]
             for row in cur.execute(
@@ -97,11 +104,13 @@ def init_db():
         }
 
         if "email" not in existing_columns:
+
             cur.execute(
                 "ALTER TABLE users ADD COLUMN email TEXT"
             )
 
         if "mobile" not in existing_columns:
+
             cur.execute(
                 "ALTER TABLE users ADD COLUMN mobile TEXT"
             )
@@ -109,6 +118,7 @@ def init_db():
         # ----------------------------------------------------
         # UNIQUE EMAIL & MOBILE
         # ----------------------------------------------------
+
         cur.execute(
             """
             CREATE UNIQUE INDEX IF NOT EXISTS
@@ -132,6 +142,7 @@ def init_db():
         # ----------------------------------------------------
         # NOTES
         # ----------------------------------------------------
+
         cur.execute(
             """
             CREATE TABLE IF NOT EXISTS notes (
@@ -149,7 +160,9 @@ def init_db():
         )
 
         conn.commit()
+
     finally:
+
         conn.close()
 
 
@@ -158,26 +171,46 @@ def init_db():
 # ============================================================
 
 def load_questions():
+
     if not QUESTIONS_FILE.exists():
-        print("Question file not found:", QUESTIONS_FILE)
+
+        print(
+            "Question file not found:",
+            QUESTIONS_FILE
+        )
+
         return {}
 
     try:
+
         with open(
             QUESTIONS_FILE,
             "r",
             encoding="utf-8"
         ) as file:
+
             data = json.load(file)
 
         if not isinstance(data, dict):
-            print("Question file error: top level must be an object.")
+
+            print(
+                "Question file error: "
+                "top level must be an object."
+            )
+
             return {}
 
         print("Questions loaded successfully.")
+
         return data
+
     except Exception as error:
-        print("Question file error:", error)
+
+        print(
+            "Question file error:",
+            error
+        )
+
         return {}
 
 
@@ -189,20 +222,26 @@ QUESTIONS_DATA = load_questions()
 # ============================================================
 
 def get_exams_for_category(category):
+
     category_data = QUESTIONS_DATA.get(category)
 
     if not isinstance(category_data, dict):
+
         return {}
 
     exams = category_data.get("exams")
 
     if isinstance(exams, dict):
+
         return exams
 
     return {
         key: value
         for key, value in category_data.items()
-        if key not in ("label", "question_bank")
+        if key not in (
+            "label",
+            "question_bank"
+        )
     }
 
 
@@ -215,18 +254,60 @@ def get_subject_questions(
     exam,
     subject
 ):
+
     exams = get_exams_for_category(category)
+
     exam_data = exams.get(exam)
 
-    if not isinstance(exam_data, dict):
+    if exam_data is None:
+
         return None
 
-    questions = exam_data.get(subject)
+    # --------------------------------------------------------
+    # CASE 1:
+    # Exam ke andar direct questions ki list hai.
+    #
+    # Example:
+    #
+    # Reasoning: [
+    #     {...},
+    #     {...}
+    # ]
+    #
+    # Is case mein subject ka naam exam hi hoga.
+    # --------------------------------------------------------
 
-    if not isinstance(questions, list):
+    if isinstance(exam_data, list):
+
+        if subject == exam:
+
+            return exam_data
+
         return None
 
-    return questions
+    # --------------------------------------------------------
+    # CASE 2:
+    # Exam ke andar subjects ka dictionary hai.
+    #
+    # Example:
+    #
+    # Exam:
+    #     Reasoning: [...]
+    #     English: [...]
+    #
+    # --------------------------------------------------------
+
+    if isinstance(exam_data, dict):
+
+        questions = exam_data.get(subject)
+
+        if not isinstance(questions, list):
+
+            return None
+
+        return questions
+
+    return None
 
 
 # ============================================================
@@ -234,10 +315,19 @@ def get_subject_questions(
 # ============================================================
 
 try:
+
     init_db()
-    print("Database initialized successfully.")
+
+    print(
+        "Database initialized successfully."
+    )
+
 except Exception as error:
-    print("Database initialization error:", error)
+
+    print(
+        "Database initialization error:",
+        error
+    )
 
 
 # ============================================================
@@ -245,12 +335,16 @@ except Exception as error:
 # ============================================================
 
 def login_required(function):
+
     @wraps(function)
     def wrapper(*args, **kwargs):
+
         if "user_id" not in session:
+
             return redirect(
                 url_for("login")
             )
+
         return function(*args, **kwargs)
 
     return wrapper
@@ -265,11 +359,28 @@ def login_required(function):
     methods=["GET", "POST"]
 )
 def register():
+
     if request.method == "POST":
-        username = request.form.get("username", "").strip()
-        email = request.form.get("email", "").strip().lower()
-        mobile = request.form.get("mobile", "").strip()
-        password = request.form.get("password", "")
+
+        username = request.form.get(
+            "username",
+            ""
+        ).strip()
+
+        email = request.form.get(
+            "email",
+            ""
+        ).strip().lower()
+
+        mobile = request.form.get(
+            "mobile",
+            ""
+        ).strip()
+
+        password = request.form.get(
+            "password",
+            ""
+        )
 
         if (
             not username
@@ -277,65 +388,119 @@ def register():
             or not mobile
             or not password
         ):
+
             return render_template(
                 "register.html",
-                error="Sabhi fields bharna zaroori hai."
+                error=(
+                    "Sabhi fields bharna "
+                    "zaroori hai."
+                )
             )
 
-        if "@" not in email or "." not in email:
+        if (
+            "@" not in email
+            or "." not in email
+        ):
+
             return render_template(
                 "register.html",
-                error="Please valid email address enter karein."
+                error=(
+                    "Please valid email "
+                    "address enter karein."
+                )
             )
 
-        if not mobile.isdigit() or len(mobile) != 10:
+        if (
+            not mobile.isdigit()
+            or len(mobile) != 10
+        ):
+
             return render_template(
                 "register.html",
-                error="Mobile number 10 digits ka hona chahiye."
+                error=(
+                    "Mobile number 10 digits "
+                    "ka hona chahiye."
+                )
             )
 
         conn = get_db()
+
         try:
+
             cur = conn.cursor()
+
+            # ------------------------------------------------
+            # USERNAME CHECK
+            # ------------------------------------------------
 
             cur.execute(
                 """
-                SELECT id FROM users
+                SELECT id
+                FROM users
                 WHERE LOWER(username) = LOWER(?)
                 """,
                 (username,)
             )
+
             if cur.fetchone():
+
                 return render_template(
                     "register.html",
-                    error="Ye username pehle se registered hai."
+                    error=(
+                        "Ye username pehle se "
+                        "registered hai."
+                    )
                 )
+
+            # ------------------------------------------------
+            # EMAIL CHECK
+            # ------------------------------------------------
 
             cur.execute(
                 """
-                SELECT id FROM users
+                SELECT id
+                FROM users
                 WHERE LOWER(email) = LOWER(?)
                 """,
                 (email,)
             )
+
             if cur.fetchone():
+
                 return render_template(
                     "register.html",
-                    error="Ye email pehle se registered hai."
+                    error=(
+                        "Ye email pehle se "
+                        "registered hai."
+                    )
                 )
+
+            # ------------------------------------------------
+            # MOBILE CHECK
+            # ------------------------------------------------
 
             cur.execute(
                 """
-                SELECT id FROM users
+                SELECT id
+                FROM users
                 WHERE mobile = ?
                 """,
                 (mobile,)
             )
+
             if cur.fetchone():
+
                 return render_template(
                     "register.html",
-                    error="Ye mobile number pehle se registered hai."
+                    error=(
+                        "Ye mobile number pehle se "
+                        "registered hai."
+                    )
                 )
+
+            # ------------------------------------------------
+            # INSERT USER
+            # ------------------------------------------------
 
             cur.execute(
                 """
@@ -351,22 +516,35 @@ def register():
                     username,
                     email,
                     mobile,
-                    generate_password_hash(password)
+                    generate_password_hash(
+                        password
+                    )
                 )
             )
+
             conn.commit()
 
         except sqlite3.IntegrityError:
+
             return render_template(
                 "register.html",
-                error="Email ya mobile number pehle se registered hai."
+                error=(
+                    "Email ya mobile number "
+                    "pehle se registered hai."
+                )
             )
+
         finally:
+
             conn.close()
 
-        return redirect(url_for("login"))
+        return redirect(
+            url_for("login")
+        )
 
-    return render_template("register.html")
+    return render_template(
+        "register.html"
+    )
 
 
 # ============================================================
@@ -378,17 +556,29 @@ def register():
     methods=["GET", "POST"]
 )
 def login():
+
     if request.method == "POST":
-        username = request.form.get("username", "").strip()
-        password = request.form.get("password", "")
+
+        username = request.form.get(
+            "username",
+            ""
+        ).strip()
+
+        password = request.form.get(
+            "password",
+            ""
+        )
 
         conn = get_db()
+
         try:
+
             cur = conn.cursor()
 
             cur.execute(
                 """
-                SELECT * FROM users
+                SELECT *
+                FROM users
                 WHERE LOWER(username) = LOWER(?)
                 """,
                 (username,)
@@ -397,25 +587,38 @@ def login():
             user = cur.fetchone()
 
         finally:
+
             conn.close()
 
-        if not user or not check_password_hash(
-            user["password_hash"],
-            password
+        if (
+            not user
+            or not check_password_hash(
+                user["password_hash"],
+                password
+            )
         ):
+
             return render_template(
                 "login.html",
-                error="Galat username ya password."
+                error=(
+                    "Galat username "
+                    "ya password."
+                )
             )
 
         session.clear()
 
         session["user_id"] = user["id"]
+
         session["username"] = user["username"]
 
-        return redirect(url_for("index"))
+        return redirect(
+            url_for("index")
+        )
 
-    return render_template("login.html")
+    return render_template(
+        "login.html"
+    )
 
 
 # ============================================================
@@ -424,8 +627,12 @@ def login():
 
 @app.route("/logout")
 def logout():
+
     session.clear()
-    return redirect(url_for("login"))
+
+    return redirect(
+        url_for("login")
+    )
 
 
 # ============================================================
@@ -435,9 +642,12 @@ def logout():
 @app.route("/")
 @login_required
 def index():
+
     return render_template(
         "index.html",
-        username=session.get("username"),
+        username=session.get(
+            "username"
+        ),
         categories=CATEGORY_LABELS
     )
 
@@ -446,15 +656,22 @@ def index():
 # EXAMS
 # ============================================================
 
-@app.route("/category/<category>")
+@app.route(
+    "/category/<category>"
+)
 @login_required
 def exams(category):
+
     if category not in QUESTIONS_DATA:
+
         abort(404)
 
-    exams_data = get_exams_for_category(category)
+    exams_data = get_exams_for_category(
+        category
+    )
 
     if not exams_data:
+
         abort(404)
 
     return render_template(
@@ -469,23 +686,67 @@ def exams(category):
 
 
 # ============================================================
-# SUBJECTS
+# SUBJECTS / EXAM
 # ============================================================
 
-@app.route("/category/<category>/exam/<path:exam>")
+@app.route(
+    "/category/<category>/exam/<path:exam>"
+)
 @login_required
-def subjects(category, exam):
+def subjects(
+    category,
+    exam
+):
+
     if category not in QUESTIONS_DATA:
+
         abort(404)
 
-    exams_data = get_exams_for_category(category)
+    exams_data = get_exams_for_category(
+        category
+    )
 
     if exam not in exams_data:
+
         abort(404)
 
-    subjects_data = exams_data[exam]
+    exam_data = exams_data[exam]
 
-    if not isinstance(subjects_data, dict):
+    # --------------------------------------------------------
+    # DIRECT QUESTION LIST
+    #
+    # Example:
+    # Teaching -> Reasoning -> [questions]
+    #
+    # Aise exam mein subjects nahi hain.
+    # Isliye seedha quiz start hoga.
+    # --------------------------------------------------------
+
+    if isinstance(exam_data, list):
+
+        if not exam_data:
+
+            abort(404)
+
+        session["category"] = category
+        session["exam"] = exam
+        session["subject"] = exam
+        session["score"] = 0
+        session["q_index"] = 0
+
+        return redirect(
+            url_for("question")
+        )
+
+    # --------------------------------------------------------
+    # SUBJECT DICTIONARY
+    # --------------------------------------------------------
+
+    if not isinstance(
+        exam_data,
+        dict
+    ):
+
         abort(404)
 
     return render_template(
@@ -496,7 +757,7 @@ def subjects(category, exam):
             category.title()
         ),
         exam=exam,
-        subjects=subjects_data
+        subjects=exam_data
     )
 
 
@@ -509,15 +770,37 @@ def subjects(category, exam):
     "/subject/<path:subject>"
 )
 @login_required
-def start_test(category, exam, subject):
+def start_test(
+    category,
+    exam,
+    subject
+):
+
     if category not in QUESTIONS_DATA:
+
         abort(404)
 
-    exams_data = get_exams_for_category(category)
+    exams_data = get_exams_for_category(
+        category
+    )
 
-    exam_data = exams_data.get(exam)
+    exam_data = exams_data.get(
+        exam
+    )
 
-    if not isinstance(exam_data, dict):
+    if exam_data is None:
+
+        abort(404)
+
+    # --------------------------------------------------------
+    # Normal subject-based exam
+    # --------------------------------------------------------
+
+    if not isinstance(
+        exam_data,
+        dict
+    ):
+
         abort(404)
 
     questions = get_subject_questions(
@@ -527,9 +810,11 @@ def start_test(category, exam, subject):
     )
 
     if questions is None:
+
         abort(404)
 
     if not questions:
+
         return render_template(
             "subjects.html",
             category=category,
@@ -539,7 +824,10 @@ def start_test(category, exam, subject):
             ),
             exam=exam,
             subjects=exam_data,
-            error="Is subject mein abhi questions available nahi hain."
+            error=(
+                "Is subject mein abhi "
+                "questions available nahi hain."
+            )
         )
 
     session["category"] = category
@@ -548,7 +836,9 @@ def start_test(category, exam, subject):
     session["score"] = 0
     session["q_index"] = 0
 
-    return redirect(url_for("question"))
+    return redirect(
+        url_for("question")
+    )
 
 
 # ============================================================
@@ -561,12 +851,28 @@ def start_test(category, exam, subject):
 )
 @login_required
 def question():
-    category = session.get("category")
-    exam = session.get("exam")
-    subject = session.get("subject")
 
-    if not category or not exam or not subject:
-        return redirect(url_for("index"))
+    category = session.get(
+        "category"
+    )
+
+    exam = session.get(
+        "exam"
+    )
+
+    subject = session.get(
+        "subject"
+    )
+
+    if (
+        not category
+        or not exam
+        or not subject
+    ):
+
+        return redirect(
+            url_for("index")
+        )
 
     quiz = get_subject_questions(
         category,
@@ -575,35 +881,89 @@ def question():
     )
 
     if not quiz:
+
         session.clear()
-        return redirect(url_for("index"))
+
+        return redirect(
+            url_for("index")
+        )
 
     try:
+
         q_index = int(
-            session.get("q_index", 0)
+            session.get(
+                "q_index",
+                0
+            )
         )
-    except (TypeError, ValueError):
+
+    except (
+        TypeError,
+        ValueError
+    ):
+
         q_index = 0
 
-    q_index = max(0, q_index)
+    q_index = max(
+        0,
+        q_index
+    )
+
+    # --------------------------------------------------------
+    # QUIZ FINISHED
+    # --------------------------------------------------------
 
     if q_index >= len(quiz):
 
         try:
+
             final_score = int(
-                session.get("score", 0)
+                session.get(
+                    "score",
+                    0
+                )
             )
-        except (TypeError, ValueError):
+
+        except (
+            TypeError,
+            ValueError
+        ):
+
             final_score = 0
 
-        save_best_score(final_score)
+        save_best_score(
+            final_score
+        )
 
-        session.pop("category", None)
-        session.pop("exam", None)
-        session.pop("subject", None)
-        session.pop("q_index", None)
-        session.pop("score", None)
-        session.pop("last_feedback", None)
+        session.pop(
+            "category",
+            None
+        )
+
+        session.pop(
+            "exam",
+            None
+        )
+
+        session.pop(
+            "subject",
+            None
+        )
+
+        session.pop(
+            "q_index",
+            None
+        )
+
+        session.pop(
+            "score",
+            None
+        )
+
+        session.pop(
+            "last_feedback",
+            None
+        )
 
         return render_template(
             "result.html",
@@ -611,17 +971,31 @@ def question():
             total=len(quiz)
         )
 
-    current_question = quiz[q_index]
+    current_question = quiz[
+        q_index
+    ]
 
-    if not isinstance(current_question, dict):
+    if not isinstance(
+        current_question,
+        dict
+    ):
+
         abort(500)
+
+    # --------------------------------------------------------
+    # SUBMIT ANSWER
+    # --------------------------------------------------------
 
     if request.method == "POST":
 
-        selected = request.form.get("option")
+        selected = request.form.get(
+            "option"
+        )
 
-        correct_answer = current_question.get(
-            "answer"
+        correct_answer = (
+            current_question.get(
+                "answer"
+            )
         )
 
         is_correct = (
@@ -629,43 +1003,67 @@ def question():
         )
 
         if is_correct:
+
             session["score"] = (
-                session.get("score", 0) + 1
+                session.get(
+                    "score",
+                    0
+                ) + 1
             )
 
         session["last_feedback"] = {
+
             "is_correct": is_correct,
+
             "selected": selected,
-            "correct_answer": correct_answer
+
+            "correct_answer":
+                correct_answer
         }
 
-        session["q_index"] = q_index + 1
+        session["q_index"] = (
+            q_index + 1
+        )
 
         return render_template(
             "answer_feedback.html",
-            feedback=session["last_feedback"],
+            feedback=session[
+                "last_feedback"
+            ],
             q_index=q_index + 1,
             total=len(quiz)
         )
 
+    # --------------------------------------------------------
+    # SHOW QUESTION
+    # --------------------------------------------------------
+
     return render_template(
         "question.html",
+
         question=current_question.get(
             "q",
             ""
         ),
+
         options=current_question.get(
             "options",
             []
         ),
+
         q_number=q_index + 1,
+
         total=len(quiz),
+
         time_limit=TIME_PER_QUESTION,
+
         category_label=CATEGORY_LABELS.get(
             category,
             ""
         ),
+
         exam=exam,
+
         subject=subject
     )
 
@@ -677,24 +1075,32 @@ def question():
 def save_best_score(score):
 
     if "user_id" not in session:
+
         return
 
     conn = get_db()
 
     try:
+
         cur = conn.cursor()
 
         cur.execute(
             """
-            SELECT best_score FROM users
+            SELECT best_score
+            FROM users
             WHERE id = ?
             """,
-            (session["user_id"],)
+            (
+                session["user_id"],
+            )
         )
 
         user = cur.fetchone()
 
-        if user and score > user["best_score"]:
+        if (
+            user
+            and score > user["best_score"]
+        ):
 
             cur.execute(
                 """
@@ -711,6 +1117,7 @@ def save_best_score(score):
             conn.commit()
 
     finally:
+
         conn.close()
 
 
@@ -736,7 +1143,9 @@ def notes():
 
         if not text:
 
-            error = "Note likhna zaroori hai."
+            error = (
+                "Note likhna zaroori hai."
+            )
 
         else:
 
@@ -765,6 +1174,7 @@ def notes():
                 conn.commit()
 
             finally:
+
                 conn.close()
 
             return redirect(
@@ -779,7 +1189,8 @@ def notes():
 
         cur.execute(
             """
-            SELECT * FROM notes
+            SELECT *
+            FROM notes
             ORDER BY created_at DESC
             LIMIT 50
             """
@@ -788,6 +1199,7 @@ def notes():
         all_notes = cur.fetchall()
 
     finally:
+
         conn.close()
 
     return render_template(
@@ -801,7 +1213,9 @@ def notes():
 # LEADERBOARD
 # ============================================================
 
-@app.route("/leaderboard")
+@app.route(
+    "/leaderboard"
+)
 @login_required
 def leaderboard():
 
@@ -823,6 +1237,7 @@ def leaderboard():
         top_users = cur.fetchall()
 
     finally:
+
         conn.close()
 
     return render_template(
@@ -837,6 +1252,7 @@ def leaderboard():
 
 @app.route("/health")
 def health():
+
     return {
         "status": "ok"
     }, 200
@@ -859,7 +1275,10 @@ def page_not_found(error):
 
     except Exception:
 
-        return "Page Not Found", 404
+        return (
+            "Page Not Found",
+            404
+        )
 
 
 @app.errorhandler(500)
@@ -871,14 +1290,17 @@ def internal_server_error(error):
             "error.html",
             error_code=500,
             error_message=(
-                "Server par internal error aa gaya. "
-                "Render logs check karein."
+                "Server par internal error "
+                "aa gaya. Render logs check karein."
             )
         ), 500
 
     except Exception:
 
-        return "Internal Server Error", 500
+        return (
+            "Internal Server Error",
+            500
+        )
 
 
 # ============================================================
