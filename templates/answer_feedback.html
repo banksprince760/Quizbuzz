@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}
+Answer - QuizBuzz
+{% endblock %}
+
+{% block content %}
+
+<div class="auth-card">
+
+    {% if feedback.is_correct %}
+
+        <h1>🎉 Correct!</h1>
+
+        <p class="subtitle">
+            Bahut badhiya! Aapka answer sahi hai.
+        </p>
+
+        <div class="error" style="background: #d1fae5; color: #065f46;">
+            ✅ Correct Answer
+        </div>
+
+    {% else %}
+
+        <h1>❌ Incorrect</h1>
+
+        <p class="subtitle">
+            Koi baat nahi, agla question try karein.
+        </p>
+
+        <div class="error">
+            ❌ Aapka answer:
+            {{ feedback.selected or "Answer nahi diya" }}
+            <br><br>
+
+            ✅ Sahi answer:
+            {{ feedback.correct_answer }}
+        </div>
+
+    {% endif %}
+
+    <p class="subtitle">
+        Question {{ q_index }} complete
+    </p>
+
+    {% if q_index < total %}
+
+        <form method="GET" action="{{ url_for('question') }}">
+
+            <button
+                type="submit"
+                class="full-btn"
+            >
+                Next Question →
+            </button>
+
+        </form>
+
+    {% else %}
+
+        <form method="GET" action="{{ url_for('question') }}">
+
+            <button
+                type="submit"
+                class="full-btn"
+            >
+                🏆 See Result
+            </button>
+
+        </form>
+
+    {% endif %}
+
+</div>
+
+{% endblock %}
