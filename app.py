@@ -159,7 +159,6 @@ def init_db():
 
     cursor = connection.cursor()
 
-    # Main users table
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS users (
@@ -170,10 +169,6 @@ def init_db():
         )
         """
     )
-
-    # --------------------------------------------------------
-    # Add new columns if old database already exists
-    # --------------------------------------------------------
 
     cursor.execute(
         "PRAGMA table_info(users)"
@@ -352,6 +347,50 @@ def index():
 
 
 # ============================================================
+# EXAMS (list exams/subjects for a category)
+# ============================================================
+
+@app.route("/exams/<category>")
+@login_required
+def exams(category):
+
+    exams_subjects = {}
+
+    for question in QUESTIONS:
+
+        if not isinstance(question, dict):
+
+            continue
+
+        question_category = str(
+            question.get("category", "")
+        ).lower()
+
+        if question_category != str(category).lower():
+
+            continue
+
+        exam_name = question.get("exam", "")
+
+        subject_name = question.get("subject", "")
+
+        exams_subjects.setdefault(
+            exam_name,
+            set()
+        ).add(subject_name)
+
+    return render_template(
+        "exams.html",
+        category=category,
+        category_label=CATEGORY_LABELS.get(
+            category,
+            category
+        ),
+        exams_subjects=exams_subjects
+    )
+
+
+# ============================================================
 # REGISTER
 # ============================================================
 
@@ -393,10 +432,6 @@ def register():
             or ""
         )
 
-        # ----------------------------------------------------
-        # Basic validation
-        # ----------------------------------------------------
-
         if (
             not name
             or not username
@@ -415,10 +450,6 @@ def register():
                 mobile=mobile
             )
 
-        # ----------------------------------------------------
-        # Password check
-        # ----------------------------------------------------
-
         if password != confirm_password:
 
             return render_template(
@@ -430,10 +461,6 @@ def register():
                 mobile=mobile
             )
 
-        # ----------------------------------------------------
-        # Mobile validation
-        # ----------------------------------------------------
-
         if not mobile.isdigit() or len(mobile) != 10:
 
             return render_template(
@@ -444,10 +471,6 @@ def register():
                 email=email,
                 mobile=mobile
             )
-
-        # ----------------------------------------------------
-        # Email basic validation
-        # ----------------------------------------------------
 
         if "@" not in email or "." not in email:
 
@@ -463,10 +486,6 @@ def register():
         connection = get_db()
 
         cursor = connection.cursor()
-
-        # ----------------------------------------------------
-        # Username check
-        # ----------------------------------------------------
 
         cursor.execute(
             """
@@ -491,10 +510,6 @@ def register():
                 email=email,
                 mobile=mobile
             )
-
-        # ----------------------------------------------------
-        # Create account
-        # ----------------------------------------------------
 
         hashed_password = generate_password_hash(
             password
@@ -560,7 +575,6 @@ def login():
 
         cursor = connection.cursor()
 
-        # Login username OR email se ho sakta hai
         cursor.execute(
             """
             SELECT *
@@ -759,7 +773,6 @@ def question():
             url_for("index")
         )
 
-    # Only 10 questions
     quiz = all_questions[:QUIZ_LENGTH]
 
     try:
@@ -782,10 +795,6 @@ def question():
         0,
         q_index
     )
-
-    # --------------------------------------------------------
-    # QUIZ FINISHED
-    # --------------------------------------------------------
 
     if q_index >= len(quiz):
 
@@ -832,10 +841,6 @@ def question():
 
         abort(500)
 
-    # --------------------------------------------------------
-    # SUBMIT ANSWER
-    # --------------------------------------------------------
-
     if request.method == "POST":
 
         selected = request.form.get(
@@ -867,10 +872,6 @@ def question():
         return redirect(
             url_for("question")
         )
-
-    # --------------------------------------------------------
-    # SHOW QUESTION
-    # --------------------------------------------------------
 
     return render_template(
         "question.html",
