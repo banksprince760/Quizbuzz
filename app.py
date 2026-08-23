@@ -159,6 +159,7 @@ def init_db():
 
     cursor = connection.cursor()
 
+    # Main users table
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS users (
@@ -169,6 +170,46 @@ def init_db():
         )
         """
     )
+
+    # --------------------------------------------------------
+    # Add new columns if old database already exists
+    # --------------------------------------------------------
+
+    cursor.execute(
+        "PRAGMA table_info(users)"
+    )
+
+    columns = [
+        row["name"]
+        for row in cursor.fetchall()
+    ]
+
+    if "name" not in columns:
+
+        cursor.execute(
+            """
+            ALTER TABLE users
+            ADD COLUMN name TEXT DEFAULT ''
+            """
+        )
+
+    if "email" not in columns:
+
+        cursor.execute(
+            """
+            ALTER TABLE users
+            ADD COLUMN email TEXT DEFAULT ''
+            """
+        )
+
+    if "mobile" not in columns:
+
+        cursor.execute(
+            """
+            ALTER TABLE users
+            ADD COLUMN mobile TEXT DEFAULT ''
+            """
+        )
 
     connection.commit()
 
@@ -322,8 +363,23 @@ def register():
 
     if request.method == "POST":
 
+        name = (
+            request.form.get("name")
+            or ""
+        ).strip()
+
         username = (
             request.form.get("username")
+            or ""
+        ).strip()
+
+        email = (
+            request.form.get("email")
+            or ""
+        ).strip()
+
+        mobile = (
+            request.form.get("mobile")
             or ""
         ).strip()
 
@@ -337,29 +393,86 @@ def register():
             or ""
         )
 
-        if not username or not password:
+        # ----------------------------------------------------
+        # Basic validation
+        # ----------------------------------------------------
+
+        if (
+            not name
+            or not username
+            or not email
+            or not mobile
+            or not password
+            or not confirm_password
+        ):
 
             return render_template(
                 "register.html",
-                error="Username aur password required hai."
+                error="Please sabhi fields fill karein.",
+                name=name,
+                username=username,
+                email=email,
+                mobile=mobile
             )
+
+        # ----------------------------------------------------
+        # Password check
+        # ----------------------------------------------------
 
         if password != confirm_password:
 
             return render_template(
                 "register.html",
-                error="Passwords match nahi kar rahe."
+                error="Passwords match nahi kar rahe.",
+                name=name,
+                username=username,
+                email=email,
+                mobile=mobile
+            )
+
+        # ----------------------------------------------------
+        # Mobile validation
+        # ----------------------------------------------------
+
+        if not mobile.isdigit() or len(mobile) != 10:
+
+            return render_template(
+                "register.html",
+                error="Mobile number 10 digits ka hona chahiye.",
+                name=name,
+                username=username,
+                email=email,
+                mobile=mobile
+            )
+
+        # ----------------------------------------------------
+        # Email basic validation
+        # ----------------------------------------------------
+
+        if "@" not in email or "." not in email:
+
+            return render_template(
+                "register.html",
+                error="Please valid email address enter karein.",
+                name=name,
+                username=username,
+                email=email,
+                mobile=mobile
             )
 
         connection = get_db()
 
         cursor = connection.cursor()
 
+        # ----------------------------------------------------
+        # Username check
+        # ----------------------------------------------------
+
         cursor.execute(
             """
             SELECT id
             FROM users
-            WHERE username = ?
+            WHERE LOWER(username) = LOWER(?)
             """,
             (username,)
         )
@@ -372,8 +485,16 @@ def register():
 
             return render_template(
                 "register.html",
-                error="Username already exist karta hai."
+                error="Ye username already use ho raha hai. Dusra username choose karein.",
+                name=name,
+                username=username,
+                email=email,
+                mobile=mobile
             )
+
+        # ----------------------------------------------------
+        # Create account
+        # ----------------------------------------------------
 
         hashed_password = generate_password_hash(
             password
@@ -384,13 +505,19 @@ def register():
             INSERT INTO users (
                 username,
                 password,
-                best_score
+                best_score,
+                name,
+                email,
+                mobile
             )
-            VALUES (?, ?, 0)
+            VALUES (?, ?, 0, ?, ?, ?)
             """,
             (
                 username,
-                hashed_password
+                hashed_password,
+                name,
+                email,
+                mobile
             )
         )
 
@@ -419,7 +546,7 @@ def login():
 
     if request.method == "POST":
 
-        username = (
+        username_or_email = (
             request.form.get("username")
             or ""
         ).strip()
@@ -433,13 +560,19 @@ def login():
 
         cursor = connection.cursor()
 
+        # Login username OR email se ho sakta hai
         cursor.execute(
             """
             SELECT *
             FROM users
-            WHERE username = ?
+            WHERE LOWER(username) = LOWER(?)
+               OR LOWER(email) = LOWER(?)
+            LIMIT 1
             """,
-            (username,)
+            (
+                username_or_email,
+                username_or_email
+            )
         )
 
         user = cursor.fetchone()
@@ -455,13 +588,15 @@ def login():
 
             session["username"] = user["username"]
 
+            session["name"] = user["name"]
+
             return redirect(
                 url_for("index")
             )
 
         return render_template(
             "login.html",
-            error="Username ya password galat hai."
+            error="Username/email ya password galat hai."
         )
 
     return render_template(
@@ -582,8 +717,6 @@ def start_quiz():
 
     session["score"] = 0
 
-    session["last_feedback"] = None
-
     return redirect(
         url_for("question")
     )
@@ -626,10 +759,7 @@ def question():
             url_for("index")
         )
 
-    # ==========================================
-    # ONLY 10 QUESTIONS
-    # ==========================================
-
+    # Only 10 questions
     quiz = all_questions[:QUIZ_LENGTH]
 
     try:
@@ -653,9 +783,9 @@ def question():
         q_index
     )
 
-    # ==========================================
+    # --------------------------------------------------------
     # QUIZ FINISHED
-    # ==========================================
+    # --------------------------------------------------------
 
     if q_index >= len(quiz):
 
@@ -681,35 +811,11 @@ def question():
 
         total_questions = len(quiz)
 
-        session.pop(
-            "category",
-            None
-        )
-
-        session.pop(
-            "exam",
-            None
-        )
-
-        session.pop(
-            "subject",
-            None
-        )
-
-        session.pop(
-            "q_index",
-            None
-        )
-
-        session.pop(
-            "score",
-            None
-        )
-
-        session.pop(
-            "last_feedback",
-            None
-        )
+        session.pop("category", None)
+        session.pop("exam", None)
+        session.pop("subject", None)
+        session.pop("q_index", None)
+        session.pop("score", None)
 
         return render_template(
             "result.html",
@@ -726,9 +832,9 @@ def question():
 
         abort(500)
 
-    # ==========================================
+    # --------------------------------------------------------
     # SUBMIT ANSWER
-    # ==========================================
+    # --------------------------------------------------------
 
     if request.method == "POST":
 
@@ -736,10 +842,8 @@ def question():
             "option"
         )
 
-        correct_answer = (
-            current_question.get(
-                "answer"
-            )
+        correct_answer = current_question.get(
+            "answer"
         )
 
         is_correct = (
@@ -756,16 +860,6 @@ def question():
                 ) + 1
             )
 
-        session["last_feedback"] = {
-
-            "is_correct": is_correct,
-
-            "selected": selected,
-
-            "correct_answer": correct_answer
-        }
-
-        # Next question
         session["q_index"] = (
             q_index + 1
         )
@@ -774,9 +868,9 @@ def question():
             url_for("question")
         )
 
-    # ==========================================
+    # --------------------------------------------------------
     # SHOW QUESTION
-    # ==========================================
+    # --------------------------------------------------------
 
     return render_template(
         "question.html",
@@ -851,4 +945,3 @@ if __name__ == "__main__":
         port=port,
         debug=False
     )
-    
