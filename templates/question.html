@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}
+Question {{ q_number }} - QuizBuzz
+{% endblock %}
+
+{% block content %}
+
+<div class="quiz-card">
+
+    <p>
+        {{ category_label }}
+    </p>
+
+    <h2>
+        Question {{ q_number }} / {{ total }}
+    </h2>
+
+    <h1>
+        {{ question }}
+    </h1>
+
+    <form method="POST">
+
+        {% for option in options %}
+
+        <label class="option">
+
+            <input
+                type="radio"
+                name="option"
+                value="{{ option }}"
+                required
+            >
+
+            {{ option }}
+
+        </label>
+
+        {% endfor %}
+
+        <button
+            type="submit"
+            class="full-btn"
+        >
+            Submit Answer
+        </button>
+
+    </form>
+
+</div>
+
+{% endblock %}
