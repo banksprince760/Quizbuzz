@@ -16,11 +16,17 @@ Question {{ q_number }} - QuizBuzz
         Question {{ q_number }} / {{ total }}
     </h2>
 
+    <!-- TIMER -->
+    <div class="timer-box">
+        ⏱️ Time:
+        <span id="timer">3</span>
+    </div>
+
     <h1>
         {{ question }}
     </h1>
 
-    <form method="POST">
+    <form method="POST" id="quizForm">
 
         {% for option in options %}
 
@@ -30,7 +36,6 @@ Question {{ q_number }} - QuizBuzz
                 type="radio"
                 name="option"
                 value="{{ option }}"
-                required
             >
 
             {{ option }}
@@ -49,5 +54,51 @@ Question {{ q_number }} - QuizBuzz
     </form>
 
 </div>
+
+
+<script>
+
+let timeLeft = 3;
+
+const timer = document.getElementById("timer");
+const form = document.getElementById("quizForm");
+
+const countdown = setInterval(function () {
+
+    timeLeft--;
+
+    timer.textContent = timeLeft;
+
+    if (timeLeft <= 0) {
+
+        clearInterval(countdown);
+
+        /*
+         * Agar user ne answer select nahi kiya,
+         * to pehla option automatically select hoga.
+         */
+        const selected = document.querySelector(
+            'input[name="option"]:checked'
+        );
+
+        if (!selected) {
+
+            const firstOption = document.querySelector(
+                'input[name="option"]'
+            );
+
+            if (firstOption) {
+                firstOption.checked = true;
+            }
+
+        }
+
+        form.submit();
+
+    }
+
+}, 1000);
+
+</script>
 
 {% endblock %}
