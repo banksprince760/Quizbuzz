@@ -6,56 +6,70 @@ Notes - QuizBuzz
 
 {% block content %}
 
-<h1>📝 My Notes</h1>
+<div class="hero">
 
-{% if error %}
+    <h1>
+        📝 Quiz Rules
+    </h1>
 
-<div class="error">
-    {{ error }}
 </div>
 
-{% endif %}
-
-<form method="POST">
-
-    <textarea
-        name="text"
-        placeholder="Apni note yahan likhein..."
-        rows="5"
-        required
-    ></textarea>
-
-    <button
-        type="submit"
-        class="full-btn"
-    >
-        Save Note
-    </button>
-
-</form>
-
-<hr>
-
-{% for note in notes %}
 
 <div class="note-card">
 
-    <p>
-        {{ note["text"] }}
-    </p>
+    <h3>
+        📝 10 Questions
+    </h3>
 
-    <small>
-        {{ note["created_at"] }}
-    </small>
+    <p>
+        Har quiz mein exactly
+        10 questions honge.
+    </p>
 
 </div>
 
-{% else %}
 
-<p>
-    Abhi koi notes nahi hain.
-</p>
+<div class="note-card">
 
-{% endfor %}
+    <h3>
+        ⏱️ 3 Seconds
+    </h3>
+
+    <p>
+        Har question ke liye
+        3 seconds milenge.
+    </p>
+
+</div>
+
+
+<div class="note-card">
+
+    <h3>
+        ⌛ Timer Over
+    </h3>
+
+    <p>
+        3 seconds mein answer
+        submit nahi kiya to
+        question wrong count hoga.
+    </p>
+
+</div>
+
+
+<div class="note-card">
+
+    <h3>
+        🎯 Result
+    </h3>
+
+    <p>
+        10 questions complete hone ke
+        baad score aur percentage
+        show hoga.
+    </p>
+
+</div>
 
 {% endblock %}
