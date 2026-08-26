@@ -6,61 +6,116 @@ Result - QuizBuzz
 
 {% block content %}
 
-<div class="quiz-card">
+<div class="result-card">
 
-    <h1>🎉 Quiz Complete!</h1>
-
-    <h2>
-        Your Result
-    </h2>
-
-    <div class="score">
-        {{ score }} / {{ total }}
+    <div class="result-icon">
+        🎉
     </div>
 
-    <p>
-        ✅ Correct Answers:
-        <strong>{{ score }}</strong>
+    <h1>
+        Quiz Complete!
+    </h1>
+
+    <p class="result-exam">
+        {{ exam }}
     </p>
 
-    <p>
-        ❌ Wrong Answers:
-        <strong>{{ total - score }}</strong>
-    </p>
 
-    <p>
-        📊 Percentage:
-        <strong>
-            {{ ((score / total) * 100)|round(0)|int }}%
-        </strong>
-    </p>
+    <div class="score-big">
 
-    {% if score == total %}
+        {{ score }}
+        /
+        {{ total }}
 
-        <h2>🏆 Perfect Score!</h2>
+    </div>
 
-    {% elif score >= total * 0.7 %}
 
-        <h2>🌟 Excellent!</h2>
+    {% set percentage =
+        ((score / total) * 100)
+        | round(0)
+        | int
+    %}
 
-    {% elif score >= total * 0.5 %}
 
-        <h2>👍 Good Job!</h2>
+    <div class="percentage">
+        {{ percentage }}%
+    </div>
+
+
+    <div class="result-stats">
+
+        <div class="correct-box">
+
+            <h3>
+                ✅ Correct
+            </h3>
+
+            <strong>
+                {{ score }}
+            </strong>
+
+        </div>
+
+
+        <div class="wrong-box">
+
+            <h3>
+                ❌ Wrong
+            </h3>
+
+            <strong>
+                {{ total - score }}
+            </strong>
+
+        </div>
+
+    </div>
+
+
+    {% if score == 10 %}
+
+    <h2>
+        🏆 Perfect Score!
+    </h2>
+
+    {% elif score >= 7 %}
+
+    <h2>
+        🌟 Excellent!
+    </h2>
+
+    {% elif score >= 5 %}
+
+    <h2>
+        👍 Good Job!
+    </h2>
 
     {% else %}
 
-        <h2>💪 Keep Practicing!</h2>
+    <h2>
+        💪 Keep Practicing!
+    </h2>
 
     {% endif %}
 
-    <br>
 
-    <a
-        href="{{ url_for('index') }}"
-        class="full-btn"
-    >
-        🏠 Back to Home
-    </a>
+    <div class="result-actions">
+
+        <a
+            href="{{ url_for('exams', category=category) }}"
+            class="btn"
+        >
+            🔄 Another Quiz
+        </a>
+
+        <a
+            href="{{ url_for('index') }}"
+            class="btn secondary-btn"
+        >
+            🏠 Home
+        </a>
+
+    </div>
 
 </div>
 
