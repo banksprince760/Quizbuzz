@@ -1,8 +1,9 @@
 import os
 import json
+import random
 import sqlite3
 from pathlib import Path
-from functools import wraps
+from functools import wraps, lru_cache
 
 from flask import (
     Flask,
@@ -47,40 +48,51 @@ DATABASE_FILE = BASE_DIR / "quizbuzz.db"
 # QUIZ SETTINGS
 # ============================================================
 
+# Har question ke liye 3 seconds
 TIME_PER_QUESTION = 3
 
+# Har quiz exactly 10 questions ka
 QUIZ_LENGTH = 10
 
 
 # ============================================================
-# CATEGORY LABELS
+# CATEGORIES
 # ============================================================
 
 CATEGORY_LABELS = {
     "teaching": "Teaching",
-    "banking": "Banking",
-    "ssc": "SSC",
-    "railway": "Railway",
-    "general": "General Knowledge",
+    "music": "Music",
+    "sports": "Sports",
+    "physical": "Physical",
+}
+
+CATEGORY_ICONS = {
+    "teaching": "📚",
+    "music": "🎵",
+    "sports": "🏆",
+    "physical": "💪",
 }
 
 
 # ============================================================
-# QUESTIONS
+# LOAD QUESTIONS
 # ============================================================
 
-QUESTIONS = []
+QUESTION_DATA = {}
 
 
 def load_questions():
 
-    global QUESTIONS
+    global QUESTION_DATA
 
     if not QUESTIONS_FILE.exists():
 
-        print("WARNING: questions.json not found.")
+        print(
+            "WARNING: questions.json not found at:",
+            QUESTIONS_FILE
+        )
 
-        QUESTIONS = []
+        QUESTION_DATA = {}
 
         return
 
@@ -94,45 +106,42 @@ def load_questions():
 
             data = json.load(file)
 
-        if isinstance(data, list):
+        if not isinstance(data, dict):
 
-            QUESTIONS = data
+            print(
+                "ERROR: questions.json root must be an object."
+            )
 
-        elif isinstance(data, dict):
+            QUESTION_DATA = {}
 
-            QUESTIONS = []
+            return
 
-            for category, values in data.items():
-
-                if isinstance(values, list):
-
-                    for item in values:
-
-                        if isinstance(item, dict):
-
-                            item = dict(item)
-
-                            item.setdefault(
-                                "category",
-                                category
-                            )
-
-                            QUESTIONS.append(item)
-
-        else:
-
-            QUESTIONS = []
+        QUESTION_DATA = data
 
         print("Questions loaded successfully.")
+
+        print(
+            "Categories:",
+            list(QUESTION_DATA.keys())
+        )
+
+    except json.JSONDecodeError as error:
+
+        print(
+            "ERROR: Invalid questions.json:",
+            error
+        )
+
+        QUESTION_DATA = {}
 
     except Exception as error:
 
         print(
-            "Error loading questions:",
+            "ERROR loading questions:",
             error
         )
 
-        QUESTIONS = []
+        QUESTION_DATA = {}
 
 
 load_questions()
@@ -165,7 +174,10 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
-            best_score INTEGER DEFAULT 0
+            best_score INTEGER DEFAULT 0,
+            name TEXT DEFAULT '',
+            email TEXT DEFAULT '',
+            mobile TEXT DEFAULT ''
         )
         """
     )
@@ -210,7 +222,9 @@ def init_db():
 
     connection.close()
 
-    print("Database initialized successfully.")
+    print(
+        "Database initialized successfully."
+    )
 
 
 init_db()
@@ -223,7 +237,10 @@ init_db()
 def login_required(function):
 
     @wraps(function)
-    def decorated_function(*args, **kwargs):
+    def decorated_function(
+        *args,
+        **kwargs
+    ):
 
         if not session.get("user_id"):
 
@@ -231,7 +248,10 @@ def login_required(function):
                 url_for("login")
             )
 
-        return function(*args, **kwargs)
+        return function(
+            *args,
+            **kwargs
+        )
 
     return decorated_function
 
@@ -240,41 +260,384 @@ def login_required(function):
 # QUESTION HELPERS
 # ============================================================
 
-def get_subject_questions(
+def normalize_text(value):
+
+    return (
+        str(value or "")
+        .strip()
+        .lower()
+        .rstrip(".")
+    )
+
+
+def get_category_data(category):
+
+    data = QUESTION_DATA.get(
+        category,
+        {}
+    )
+
+    if not isinstance(data, dict):
+
+        return {}
+
+    return data
+
+
+def get_category_exams(category):
+
+    category_data = get_category_data(
+        category
+    )
+
+    exams = category_data.get(
+        "exams",
+        {}
+    )
+
+    if not isinstance(exams, dict):
+
+        return {}
+
+    return exams
+
+
+def get_raw_exam_questions(
     category,
-    exam,
-    subject
+    exam
 ):
 
-    result = []
+    exams = get_category_exams(
+        category
+    )
 
-    for question in QUESTIONS:
+    questions = exams.get(
+        exam,
+        []
+    )
 
-        if not isinstance(question, dict):
+    if not isinstance(
+        questions,
+        list
+    ):
 
+        return []
+
+    return questions
+
+
+def get_answer_pool(
+    category,
+    exam
+):
+
+    answers = []
+
+    # Pehle isi exam ke answers
+    questions = get_raw_exam_questions(
+        category,
+        exam
+    )
+
+    for item in questions:
+
+        if not isinstance(item, dict):
             continue
 
-        question_category = str(
-            question.get("category", "")
-        ).lower()
+        answer = str(
+            item.get("answer", "")
+        ).strip()
 
-        question_exam = str(
-            question.get("exam", "")
-        ).lower()
+        if answer:
+            answers.append(answer)
 
-        question_subject = str(
-            question.get("subject", "")
-        ).lower()
+    # Agar isi exam mein enough answers nahi hain,
+    # category ke doosre question banks se lete hain.
+    if len(set(answers)) < 4:
+
+        exams = get_category_exams(
+            category
+        )
+
+        for exam_questions in exams.values():
+
+            if not isinstance(
+                exam_questions,
+                list
+            ):
+                continue
+
+            for item in exam_questions:
+
+                if not isinstance(
+                    item,
+                    dict
+                ):
+                    continue
+
+                answer = str(
+                    item.get(
+                        "answer",
+                        ""
+                    )
+                ).strip()
+
+                if answer:
+                    answers.append(answer)
+
+    return list(
+        dict.fromkeys(answers)
+    )
+
+
+def find_correct_option(
+    answer,
+    options
+):
+
+    normalized_answer = normalize_text(
+        answer
+    )
+
+    # Exact match
+    for option in options:
 
         if (
-            question_category == str(category).lower()
-            and question_exam == str(exam).lower()
-            and question_subject == str(subject).lower()
+            normalize_text(option)
+            == normalized_answer
         ):
 
-            result.append(question)
+            return option
+
+    # Sports jaise answers:
+    # option = Sunil Gavaskar
+    # answer = Sunil Gavaskar (Achieved...)
+    for option in options:
+
+        normalized_option = (
+            normalize_text(option)
+        )
+
+        if (
+            normalized_answer.startswith(
+                normalized_option
+            )
+            or normalized_option.startswith(
+                normalized_answer
+            )
+        ):
+
+            return option
+
+    return None
+
+
+def prepare_question(
+    category,
+    exam,
+    question
+):
+
+    if not isinstance(
+        question,
+        dict
+    ):
+
+        return None
+
+    question_text = str(
+        question.get(
+            "q",
+            ""
+        )
+    ).strip()
+
+    answer = str(
+        question.get(
+            "answer",
+            ""
+        )
+    ).strip()
+
+    options = question.get(
+        "options",
+        []
+    )
+
+    # Question text aur answer dono zaroori hain
+    if not question_text:
+        return None
+
+    if not answer:
+        return None
+
+    if not isinstance(
+        options,
+        list
+    ):
+
+        options = []
+
+    options = [
+        str(option).strip()
+        for option in options
+        if str(option).strip()
+    ]
+
+    # --------------------------------------------------------
+    # NORMAL MCQ
+    # --------------------------------------------------------
+
+    if len(options) >= 2:
+
+        correct_option = (
+            find_correct_option(
+                answer,
+                options
+            )
+        )
+
+        if correct_option is None:
+
+            options.append(answer)
+
+            correct_option = answer
+
+        return {
+            "q": question_text,
+            "options": options,
+            "answer": correct_option,
+            "source_id": question.get(
+                "source_id"
+            ),
+        }
+
+    # --------------------------------------------------------
+    # ANSWER HAI BUT OPTIONS EMPTY
+    # --------------------------------------------------------
+
+    answer_pool = get_answer_pool(
+        category,
+        exam
+    )
+
+    possible_wrong_answers = [
+        item
+        for item in answer_pool
+        if normalize_text(item)
+        != normalize_text(answer)
+    ]
+
+    if len(possible_wrong_answers) < 3:
+
+        return None
+
+    seed = (
+        f"{category}|"
+        f"{exam}|"
+        f"{question.get('source_id')}|"
+        f"{question_text}"
+    )
+
+    rng = random.Random(seed)
+
+    wrong_options = rng.sample(
+        possible_wrong_answers,
+        3
+    )
+
+    generated_options = (
+        wrong_options + [answer]
+    )
+
+    rng.shuffle(
+        generated_options
+    )
+
+    return {
+        "q": question_text,
+        "options": generated_options,
+        "answer": answer,
+        "source_id": question.get(
+            "source_id"
+        ),
+    }
+
+
+@lru_cache(maxsize=None)
+def get_playable_questions(
+    category,
+    exam
+):
+
+    prepared_questions = []
+
+    raw_questions = (
+        get_raw_exam_questions(
+            category,
+            exam
+        )
+    )
+
+    for question in raw_questions:
+
+        prepared = prepare_question(
+            category,
+            exam,
+            question
+        )
+
+        if prepared:
+
+            prepared_questions.append(
+                prepared
+            )
+
+    return prepared_questions
+
+
+@lru_cache(maxsize=None)
+def get_available_exams(category):
+
+    result = {}
+
+    exams = get_category_exams(
+        category
+    )
+
+    for exam_name in exams.keys():
+
+        playable_questions = (
+            get_playable_questions(
+                category,
+                exam_name
+            )
+        )
+
+        # Sirf wahi exam show hoga
+        # jisme kam se kam 10 playable questions hain.
+        if (
+            len(playable_questions)
+            >= QUIZ_LENGTH
+        ):
+
+            result[exam_name] = len(
+                playable_questions
+            )
 
     return result
+
+
+def answers_match(
+    selected,
+    correct
+):
+
+    return (
+        normalize_text(selected)
+        ==
+        normalize_text(correct)
+    )
 
 
 # ============================================================
@@ -283,10 +646,11 @@ def get_subject_questions(
 
 def save_best_score(score):
 
-    user_id = session.get("user_id")
+    user_id = session.get(
+        "user_id"
+    )
 
     if not user_id:
-
         return
 
     connection = get_db()
@@ -306,7 +670,10 @@ def save_best_score(score):
 
     if row:
 
-        old_score = row["best_score"] or 0
+        old_score = (
+            row["best_score"]
+            or 0
+        )
 
         if score > old_score:
 
@@ -332,61 +699,94 @@ def save_best_score(score):
 # ============================================================
 
 @app.route("/")
+@login_required
 def index():
 
-    if not session.get("user_id"):
+    categories = {}
 
-        return redirect(
-            url_for("login")
+    for key in [
+        "teaching",
+        "music",
+        "sports",
+        "physical"
+    ]:
+
+        category_data = (
+            get_category_data(key)
         )
+
+        categories[key] = {
+
+            "label": category_data.get(
+                "label",
+                CATEGORY_LABELS.get(
+                    key,
+                    key.title()
+                )
+            ),
+
+            "icon": CATEGORY_ICONS.get(
+                key,
+                "📖"
+            ),
+        }
+
+    username = (
+        session.get("name")
+        or session.get("username")
+        or "Player"
+    )
 
     return render_template(
         "index.html",
-        categories=CATEGORY_LABELS
+        categories=categories,
+        username=username
     )
 
 
 # ============================================================
-# EXAMS (list exams/subjects for a category)
+# EXAMS
 # ============================================================
 
-@app.route("/exams/<category>")
+@app.route(
+    "/exams/<category>"
+)
 @login_required
 def exams(category):
 
-    exams_subjects = {}
+    if category not in CATEGORY_LABELS:
 
-    for question in QUESTIONS:
+        abort(404)
 
-        if not isinstance(question, dict):
+    category_data = (
+        get_category_data(
+            category
+        )
+    )
 
-            continue
+    if not category_data:
 
-        question_category = str(
-            question.get("category", "")
-        ).lower()
+        abort(404)
 
-        if question_category != str(category).lower():
-
-            continue
-
-        exam_name = question.get("exam", "")
-
-        subject_name = question.get("subject", "")
-
-        exams_subjects.setdefault(
-            exam_name,
-            set()
-        ).add(subject_name)
+    available_exams = (
+        get_available_exams(
+            category
+        )
+    )
 
     return render_template(
         "exams.html",
+
         category=category,
-        category_label=CATEGORY_LABELS.get(
-            category,
-            category
+
+        category_label=(
+            CATEGORY_LABELS.get(
+                category,
+                category.title()
+            )
         ),
-        exams_subjects=exams_subjects
+
+        exams=available_exams,
     )
 
 
@@ -428,7 +828,9 @@ def register():
         )
 
         confirm_password = (
-            request.form.get("confirm_password")
+            request.form.get(
+                "confirm_password"
+            )
             or ""
         )
 
@@ -443,7 +845,11 @@ def register():
 
             return render_template(
                 "register.html",
-                error="Please sabhi fields fill karein.",
+
+                error=(
+                    "Please sabhi fields fill karein."
+                ),
+
                 name=name,
                 username=username,
                 email=email,
@@ -454,29 +860,47 @@ def register():
 
             return render_template(
                 "register.html",
-                error="Passwords match nahi kar rahe.",
+
+                error=(
+                    "Passwords match nahi kar rahe."
+                ),
+
                 name=name,
                 username=username,
                 email=email,
                 mobile=mobile
             )
 
-        if not mobile.isdigit() or len(mobile) != 10:
+        if (
+            not mobile.isdigit()
+            or len(mobile) != 10
+        ):
 
             return render_template(
                 "register.html",
-                error="Mobile number 10 digits ka hona chahiye.",
+
+                error=(
+                    "Mobile number 10 digits ka hona chahiye."
+                ),
+
                 name=name,
                 username=username,
                 email=email,
                 mobile=mobile
             )
 
-        if "@" not in email or "." not in email:
+        if (
+            "@" not in email
+            or "." not in email
+        ):
 
             return render_template(
                 "register.html",
-                error="Please valid email address enter karein.",
+
+                error=(
+                    "Please valid email address enter karein."
+                ),
+
                 name=name,
                 username=username,
                 email=email,
@@ -492,11 +916,18 @@ def register():
             SELECT id
             FROM users
             WHERE LOWER(username) = LOWER(?)
+               OR LOWER(email) = LOWER(?)
+            LIMIT 1
             """,
-            (username,)
+            (
+                username,
+                email
+            )
         )
 
-        existing_user = cursor.fetchone()
+        existing_user = (
+            cursor.fetchone()
+        )
 
         if existing_user:
 
@@ -504,15 +935,21 @@ def register():
 
             return render_template(
                 "register.html",
-                error="Ye username already use ho raha hai. Dusra username choose karein.",
+
+                error=(
+                    "Username ya email already registered hai."
+                ),
+
                 name=name,
                 username=username,
                 email=email,
                 mobile=mobile
             )
 
-        hashed_password = generate_password_hash(
-            password
+        hashed_password = (
+            generate_password_hash(
+                password
+            )
         )
 
         cursor.execute(
@@ -559,15 +996,25 @@ def register():
 )
 def login():
 
+    if session.get("user_id"):
+
+        return redirect(
+            url_for("index")
+        )
+
     if request.method == "POST":
 
         username_or_email = (
-            request.form.get("username")
+            request.form.get(
+                "username"
+            )
             or ""
         ).strip()
 
         password = (
-            request.form.get("password")
+            request.form.get(
+                "password"
+            )
             or ""
         )
 
@@ -593,16 +1040,27 @@ def login():
 
         connection.close()
 
-        if user and check_password_hash(
-            user["password"],
-            password
+        if (
+            user
+            and check_password_hash(
+                user["password"],
+                password
+            )
         ):
 
-            session["user_id"] = user["id"]
+            session.clear()
 
-            session["username"] = user["username"]
+            session["user_id"] = (
+                user["id"]
+            )
 
-            session["name"] = user["name"]
+            session["username"] = (
+                user["username"]
+            )
+
+            session["name"] = (
+                user["name"]
+            )
 
             return redirect(
                 url_for("index")
@@ -610,7 +1068,10 @@ def login():
 
         return render_template(
             "login.html",
-            error="Username/email ya password galat hai."
+
+            error=(
+                "Username/email ya password galat hai."
+            )
         )
 
     return render_template(
@@ -659,9 +1120,13 @@ def leaderboard():
 
     cursor.execute(
         """
-        SELECT username, best_score
+        SELECT
+            username,
+            best_score
         FROM users
-        ORDER BY best_score DESC, username ASC
+        ORDER BY
+            best_score DESC,
+            username ASC
         """
     )
 
@@ -687,45 +1152,47 @@ def leaderboard():
 def start_quiz():
 
     category = (
-        request.form.get("category")
+        request.form.get(
+            "category"
+        )
         or ""
     ).strip()
 
     exam = (
-        request.form.get("exam")
+        request.form.get(
+            "exam"
+        )
         or ""
     ).strip()
 
-    subject = (
-        request.form.get("subject")
-        or ""
-    ).strip()
-
-    if not category or not exam or not subject:
+    if (
+        not category
+        or not exam
+    ):
 
         return redirect(
             url_for("index")
         )
 
-    questions = get_subject_questions(
-        category,
-        exam,
-        subject
+    questions = (
+        get_playable_questions(
+            category,
+            exam
+        )
     )
 
-    if not questions:
+    if len(questions) < QUIZ_LENGTH:
 
-        return render_template(
-            "index.html",
-            categories=CATEGORY_LABELS,
-            error="Is subject ke questions available nahi hain."
+        return redirect(
+            url_for(
+                "exams",
+                category=category
+            )
         )
 
     session["category"] = category
 
     session["exam"] = exam
-
-    session["subject"] = subject
 
     session["q_index"] = 0
 
@@ -747,33 +1214,43 @@ def start_quiz():
 @login_required
 def question():
 
-    category = session.get("category")
-
-    exam = session.get("exam")
-
-    subject = session.get("subject")
-
-    if not category or not exam or not subject:
-
-        return redirect(
-            url_for("index")
-        )
-
-    all_questions = get_subject_questions(
-        category,
-        exam,
-        subject
+    category = session.get(
+        "category"
     )
 
-    if not all_questions:
+    exam = session.get(
+        "exam"
+    )
 
-        session.clear()
+    if (
+        not category
+        or not exam
+    ):
 
         return redirect(
             url_for("index")
         )
 
-    quiz = all_questions[:QUIZ_LENGTH]
+    all_questions = (
+        get_playable_questions(
+            category,
+            exam
+        )
+    )
+
+    if len(all_questions) < QUIZ_LENGTH:
+
+        return redirect(
+            url_for(
+                "exams",
+                category=category
+            )
+        )
+
+    # Exactly 10 questions
+    quiz = all_questions[
+        :QUIZ_LENGTH
+    ]
 
     try:
 
@@ -796,7 +1273,11 @@ def question():
         q_index
     )
 
-    if q_index >= len(quiz):
+    # ========================================================
+    # QUIZ COMPLETE
+    # ========================================================
+
+    if q_index >= QUIZ_LENGTH:
 
         try:
 
@@ -818,28 +1299,49 @@ def question():
             final_score
         )
 
-        total_questions = len(quiz)
+        result_category = category
 
-        session.pop("category", None)
-        session.pop("exam", None)
-        session.pop("subject", None)
-        session.pop("q_index", None)
-        session.pop("score", None)
+        result_exam = exam
+
+        session.pop(
+            "category",
+            None
+        )
+
+        session.pop(
+            "exam",
+            None
+        )
+
+        session.pop(
+            "q_index",
+            None
+        )
+
+        session.pop(
+            "score",
+            None
+        )
 
         return render_template(
             "result.html",
+
             score=final_score,
-            total=total_questions
+
+            total=QUIZ_LENGTH,
+
+            category=result_category,
+
+            exam=result_exam
         )
 
-    current_question = quiz[q_index]
+    current_question = quiz[
+        q_index
+    ]
 
-    if not isinstance(
-        current_question,
-        dict
-    ):
-
-        abort(500)
+    # ========================================================
+    # ANSWER SUBMITTED / TIMER EXPIRED
+    # ========================================================
 
     if request.method == "POST":
 
@@ -847,22 +1349,45 @@ def question():
             "option"
         )
 
-        correct_answer = current_question.get(
-            "answer"
+        timed_out = (
+            request.form.get(
+                "timed_out"
+            )
+            == "1"
         )
 
-        is_correct = (
-            selected is not None
-            and selected == correct_answer
+        correct_answer = (
+            current_question.get(
+                "answer",
+                ""
+            )
         )
+
+        is_correct = False
+
+        # Timer expire hua to answer wrong.
+        if (
+            not timed_out
+            and selected is not None
+        ):
+
+            is_correct = (
+                answers_match(
+                    selected,
+                    correct_answer
+                )
+            )
 
         if is_correct:
 
             session["score"] = (
-                session.get(
-                    "score",
-                    0
-                ) + 1
+                int(
+                    session.get(
+                        "score",
+                        0
+                    )
+                )
+                + 1
             )
 
         session["q_index"] = (
@@ -872,6 +1397,10 @@ def question():
         return redirect(
             url_for("question")
         )
+
+    # ========================================================
+    # SHOW QUESTION
+    # ========================================================
 
     return render_template(
         "question.html",
@@ -888,23 +1417,23 @@ def question():
 
         q_number=q_index + 1,
 
-        total=len(quiz),
+        total=QUIZ_LENGTH,
 
         time_limit=TIME_PER_QUESTION,
 
-        category_label=CATEGORY_LABELS.get(
-            category,
-            category
+        category_label=(
+            CATEGORY_LABELS.get(
+                category,
+                category.title()
+            )
         ),
 
-        exam=exam,
-
-        subject=subject
+        exam=exam
     )
 
 
 # ============================================================
-# RESULT
+# RESULT URL
 # ============================================================
 
 @app.route("/result")
@@ -924,7 +1453,11 @@ def result():
 def health():
 
     return {
-        "status": "ok"
+        "status": "ok",
+        "questions_file": QUESTIONS_FILE.exists(),
+        "categories": list(
+            QUESTION_DATA.keys()
+        ),
     }
 
 
