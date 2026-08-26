@@ -6,32 +6,74 @@ Leaderboard - QuizBuzz
 
 {% block content %}
 
-<h1>🏆 Leaderboard</h1>
+<div class="hero">
 
-<div class="leaderboard">
-
-    {% for user in top_users %}
-
-    <div class="leaderboard-row">
-
-        <span>
-            {{ loop.index }}.
-            {{ user["username"] }}
-        </span>
-
-        <strong>
-            {{ user["best_score"] }}
-        </strong>
-
-    </div>
-
-    {% else %}
+    <h1>
+        🏆 Leaderboard
+    </h1>
 
     <p>
-        Abhi leaderboard empty hai.
+        Best Quiz Scores
     </p>
 
-    {% endfor %}
+</div>
+
+
+<div class="card table-wrapper">
+
+    <table class="leaderboard-table">
+
+        <thead>
+
+        <tr>
+
+            <th>Rank</th>
+
+            <th>Username</th>
+
+            <th>Best Score</th>
+
+        </tr>
+
+        </thead>
+
+
+        <tbody>
+
+        {% for user in users %}
+
+        <tr>
+
+            <td>
+                {{ loop.index }}
+            </td>
+
+            <td>
+                {{ user["username"] }}
+            </td>
+
+            <td>
+                {{ user["best_score"] }}
+                / 10
+            </td>
+
+        </tr>
+
+        {% else %}
+
+        <tr>
+
+            <td colspan="3">
+                No scores yet.
+            </td>
+
+        </tr>
+
+        {% endfor %}
+
+        </tbody>
+
+    </table>
 
 </div>
 
