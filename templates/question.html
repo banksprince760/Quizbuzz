@@ -8,45 +8,94 @@ Question {{ q_number }} - QuizBuzz
 
 <div class="quiz-card">
 
-    <p>
-        {{ category_label }}
-    </p>
+    <div class="quiz-meta">
 
-    <h2>
-        Question {{ q_number }} / {{ total }}
-    </h2>
+        <span>
+            {{ category_label }}
+        </span>
 
-    <!-- TIMER -->
-    <div class="timer-box">
-        ⏱️ Time:
-        <span id="timer">3</span>
+        <span>
+            {{ exam }}
+        </span>
+
     </div>
 
-    <h1>
+
+    <div class="quiz-top">
+
+        <p class="progress">
+
+            Question
+            {{ q_number }}
+            /
+            {{ total }}
+
+        </p>
+
+
+        <div
+            class="timer-box"
+            id="timerBox"
+        >
+
+            ⏱️
+
+            <span id="timer">
+                {{ time_limit }}
+            </span>
+
+            sec
+
+        </div>
+
+    </div>
+
+
+    <h2 class="question-text">
         {{ question }}
-    </h1>
+    </h2>
 
-    <form method="POST" id="quizForm">
 
-        {% for option in options %}
+    <form
+        method="POST"
+        id="quizForm"
+    >
 
-        <label class="option">
+        <input
+            type="hidden"
+            name="timed_out"
+            id="timedOut"
+            value="0"
+        >
 
-            <input
-                type="radio"
-                name="option"
-                value="{{ option }}"
-            >
 
-            {{ option }}
+        <div class="options-list">
 
-        </label>
+            {% for option in options %}
 
-        {% endfor %}
+            <label class="option-label">
+
+                <input
+                    type="radio"
+                    name="option"
+                    value="{{ option }}"
+                >
+
+                <span>
+                    {{ option }}
+                </span>
+
+            </label>
+
+            {% endfor %}
+
+        </div>
+
 
         <button
             type="submit"
             class="full-btn"
+            id="submitButton"
         >
             Submit Answer
         </button>
@@ -58,46 +107,91 @@ Question {{ q_number }} - QuizBuzz
 
 <script>
 
-let timeLeft = 3;
+let timeLeft =
+    {{ time_limit | int }};
 
-const timer = document.getElementById("timer");
-const form = document.getElementById("quizForm");
+let submitted = false;
 
-const countdown = setInterval(function () {
+const timer =
+    document.getElementById("timer");
 
-    timeLeft--;
+const timerBox =
+    document.getElementById("timerBox");
 
-    timer.textContent = timeLeft;
+const quizForm =
+    document.getElementById("quizForm");
 
-    if (timeLeft <= 0) {
+const timedOut =
+    document.getElementById("timedOut");
 
-        clearInterval(countdown);
+const submitButton =
+    document.getElementById("submitButton");
 
-        /*
-         * Agar user ne answer select nahi kiya,
-         * to pehla option automatically select hoga.
-         */
-        const selected = document.querySelector(
-            'input[name="option"]:checked'
-        );
 
-        if (!selected) {
+const countdown = setInterval(
+    function () {
 
-            const firstOption = document.querySelector(
-                'input[name="option"]'
+        timeLeft--;
+
+        timer.textContent =
+            Math.max(
+                timeLeft,
+                0
             );
 
-            if (firstOption) {
-                firstOption.checked = true;
-            }
+        if (timeLeft <= 1) {
+
+            timerBox.classList.add(
+                "timer-danger"
+            );
 
         }
 
-        form.submit();
+        if (
+            timeLeft <= 0
+            && !submitted
+        ) {
+
+            submitted = true;
+
+            clearInterval(
+                countdown
+            );
+
+            timedOut.value =
+                "1";
+
+            submitButton.disabled =
+                true;
+
+            quizForm.submit();
+
+        }
+
+    },
+    1000
+);
+
+
+quizForm.addEventListener(
+    "submit",
+    function () {
+
+        if (!submitted) {
+
+            submitted = true;
+
+            clearInterval(
+                countdown
+            );
+
+            submitButton.disabled =
+                true;
+
+        }
 
     }
-
-}, 1000);
+);
 
 </script>
 
