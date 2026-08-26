@@ -11,22 +11,14 @@
     >
 
     <title>
-        {% block title %}QuizBuzz{% endblock %}
+        {% block title %}
+        QuizBuzz
+        {% endblock %}
     </title>
 
     <link
         rel="stylesheet"
         href="{{ url_for('static', filename='style.css') }}"
-    >
-
-    <link
-        rel="manifest"
-        href="{{ url_for('static', filename='manifest.json') }}"
-    >
-
-    <meta
-        name="theme-color"
-        content="#833ab4"
     >
 
 </head>
@@ -35,9 +27,12 @@
 
 <header class="navbar">
 
-    <div class="logo">
+    <a
+        href="{{ url_for('index') }}"
+        class="logo"
+    >
         ⚡ QuizBuzz
-    </div>
+    </a>
 
     {% if session.get("user_id") %}
 
@@ -65,28 +60,13 @@
 
 </header>
 
+
 <main class="container">
 
     {% block content %}
     {% endblock %}
 
 </main>
-
-<script>
-
-if ("serviceWorker" in navigator) {
-
-    window.addEventListener("load", function () {
-
-        navigator.serviceWorker.register(
-            "/static/service-worker.js"
-        );
-
-    });
-
-}
-
-</script>
 
 </body>
 
