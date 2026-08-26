@@ -8,17 +8,19 @@ Register - QuizBuzz
 
 <div class="auth-card">
 
-    <h1>📝 Register</h1>
+    <h1>
+        Create Account
+    </h1>
 
-    <p class="subtitle">
-        QuizBuzz par account banayein
-    </p>
 
     {% if error %}
+
     <div class="error">
         {{ error }}
     </div>
+
     {% endif %}
+
 
     <form method="POST">
 
@@ -29,10 +31,10 @@ Register - QuizBuzz
         <input
             type="text"
             name="name"
-            placeholder="Apna naam"
             value="{{ name or '' }}"
             required
         >
+
 
         <label>
             Username
@@ -41,10 +43,10 @@ Register - QuizBuzz
         <input
             type="text"
             name="username"
-            placeholder="Username"
             value="{{ username or '' }}"
             required
         >
+
 
         <label>
             Email
@@ -53,10 +55,10 @@ Register - QuizBuzz
         <input
             type="email"
             name="email"
-            placeholder="example@gmail.com"
             value="{{ email or '' }}"
             required
         >
+
 
         <label>
             Mobile Number
@@ -65,12 +67,11 @@ Register - QuizBuzz
         <input
             type="tel"
             name="mobile"
-            placeholder="10 digit mobile number"
             value="{{ mobile or '' }}"
             maxlength="10"
-            pattern="[0-9]{10}"
             required
         >
+
 
         <label>
             Password
@@ -79,10 +80,9 @@ Register - QuizBuzz
         <input
             type="password"
             name="password"
-            placeholder="Password"
-            minlength="4"
             required
         >
+
 
         <label>
             Confirm Password
@@ -91,10 +91,9 @@ Register - QuizBuzz
         <input
             type="password"
             name="confirm_password"
-            placeholder="Password dobara enter karein"
-            minlength="4"
             required
         >
+
 
         <button
             type="submit"
@@ -105,9 +104,10 @@ Register - QuizBuzz
 
     </form>
 
+
     <p class="auth-bottom">
 
-        Already account hai?
+        Already registered?
 
         <a href="{{ url_for('login') }}">
             Login
