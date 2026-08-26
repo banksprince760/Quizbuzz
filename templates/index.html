@@ -8,31 +8,45 @@ Home - QuizBuzz
 
 <div class="hero">
 
-    <h1>⚡ QuizBuzz</h1>
+    <h1>
+        ⚡ QuizBuzz
+    </h1>
 
     <h2>
         Welcome, {{ username }}!
     </h2>
 
     <p>
-        Apna category choose karein aur quiz start karein.
+        Category choose karein aur quiz start karein.
     </p>
 
 </div>
 
+
+<h2 class="section-title">
+    Choose Category
+</h2>
+
+
 <div class="category-grid">
 
-    {% for key, label in categories.items() %}
+    {% for key, data in categories.items() %}
 
     <a
         href="{{ url_for('exams', category=key) }}"
         class="category-card"
     >
 
-        <h2>{{ label }}</h2>
+        <div class="category-icon">
+            {{ data.icon }}
+        </div>
+
+        <h2>
+            {{ data.label }}
+        </h2>
 
         <p>
-            Quiz start karne ke liye click karein
+            Available quizzes dekhein
         </p>
 
     </a>
