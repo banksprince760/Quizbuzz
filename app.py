@@ -425,10 +425,15 @@ def get_available_exams(category):
             exam_name
         )
 
-        if len(questions) >= QUIZ_LENGTH:
+        quiz_length = min(
+            len(questions),
+            QUIZ_LENGTH
+        )
 
-            available[exam_name] = len(
-                questions
+        if quiz_length > 0:
+
+            available[exam_name] = (
+                quiz_length
             )
 
     return available
@@ -509,6 +514,9 @@ def index():
             key,
             {}
         )
+
+        if not get_available_exams(key):
+            continue
 
         categories[key] = {
             "label": data.get(
@@ -924,7 +932,7 @@ def start_quiz():
         exam
     )
 
-    if len(questions) < QUIZ_LENGTH:
+    if not questions:
 
         return redirect(
             url_for(
@@ -976,7 +984,7 @@ def question():
         exam
     )
 
-    if len(questions) < QUIZ_LENGTH:
+    if not questions:
 
         return redirect(
             url_for(
@@ -986,6 +994,8 @@ def question():
         )
 
     quiz = questions[:QUIZ_LENGTH]
+
+    quiz_length = len(quiz)
 
     q_index = int(
         session.get(
@@ -998,7 +1008,7 @@ def question():
     # RESULT AFTER 10 QUESTIONS
     # ========================================================
 
-    if q_index >= QUIZ_LENGTH:
+    if q_index >= quiz_length:
 
         final_score = int(
             session.get(
@@ -1007,8 +1017,14 @@ def question():
             )
         )
 
-        save_best_score(
+        leaderboard_score = round(
             final_score
+            * QUIZ_LENGTH
+            / quiz_length
+        )
+
+        save_best_score(
+            leaderboard_score
         )
 
         result_category = category
@@ -1038,7 +1054,7 @@ def question():
         return render_template(
             "result.html",
             score=final_score,
-            total=QUIZ_LENGTH,
+            total=quiz_length,
             category=result_category,
             exam=result_exam
         )
@@ -1100,7 +1116,7 @@ def question():
         question=current_question["q"],
         options=current_question["options"],
         q_number=q_index + 1,
-        total=QUIZ_LENGTH,
+        total=quiz_length,
         time_limit=TIME_PER_QUESTION,
         category_label=(
             CATEGORY_LABELS.get(
@@ -1161,3 +1177,4 @@ if __name__ == "__main__":
         port=port,
         debug=False
     )
+
