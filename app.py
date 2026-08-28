@@ -1,5 +1,6 @@
 import os
 import json
+import gzip
 import sqlite3
 from pathlib import Path
 from functools import wraps
@@ -40,14 +41,14 @@ BASE_DIR = Path(__file__).resolve().parent
 
 QUESTIONS_FILE = BASE_DIR / "questions.json"
 
+COMPRESSED_QUESTIONS_FILE = BASE_DIR / "questions.json.gz"
+
 DATABASE_FILE = BASE_DIR / "quizbuzz.db"
 
 
 # ============================================================
 # QUIZ SETTINGS
 # ============================================================
-
-TIME_PER_QUESTION = 3
 
 QUIZ_LENGTH = 10
 
@@ -57,17 +58,39 @@ QUIZ_LENGTH = 10
 # ============================================================
 
 CATEGORY_LABELS = {
-    "teaching": "Teaching",
-    "music": "Music",
+    "civil-services-central": "Civil Services & Central Government",
+    "state-civil-services": "State Civil Services",
+    "banking-finance": "Banking, Insurance & Finance",
+    "defence-paramilitary": "Defence & Paramilitary",
+    "railway-recruitment": "Railway & Other Recruitment",
+    "teaching": "Teaching & Research",
+    "engineering": "Engineering",
+    "medical": "Medical & Allied Sciences",
+    "management": "Management",
+    "law": "Law",
+    "commerce-professional": "Commerce & Professional",
+    "university-admission": "General University Admission",
+    "physical": "Physical Education",
     "sports": "Sports",
-    "physical": "Physical",
+    "music": "Music",
 }
 
 CATEGORY_ICONS = {
+    "civil-services-central": "🏛️",
+    "state-civil-services": "🗺️",
+    "banking-finance": "🏦",
+    "defence-paramilitary": "🛡️",
+    "railway-recruitment": "🚆",
     "teaching": "📚",
-    "music": "🎵",
-    "sports": "🏆",
+    "engineering": "⚙️",
+    "medical": "🩺",
+    "management": "📊",
+    "law": "⚖️",
+    "commerce-professional": "💼",
+    "university-admission": "🎓",
     "physical": "💪",
+    "sports": "🏆",
+    "music": "🎵",
 }
 
 
@@ -82,7 +105,7 @@ def load_questions():
 
     global QUESTION_DATA
 
-    if not QUESTIONS_FILE.exists():
+    if not QUESTIONS_FILE.exists() and not COMPRESSED_QUESTIONS_FILE.exists():
 
         print(
             f"WARNING: questions.json not found: "
@@ -95,10 +118,10 @@ def load_questions():
 
     try:
 
-        with QUESTIONS_FILE.open(
-            "r",
-            encoding="utf-8"
-        ) as file:
+        opener = gzip.open if COMPRESSED_QUESTIONS_FILE.exists() else open
+        source_file = COMPRESSED_QUESTIONS_FILE if COMPRESSED_QUESTIONS_FILE.exists() else QUESTIONS_FILE
+
+        with opener(source_file, "rt", encoding="utf-8") as file:
 
             data = json.load(file)
 
@@ -503,12 +526,7 @@ def index():
 
     categories = {}
 
-    for key in [
-        "teaching",
-        "music",
-        "sports",
-        "physical",
-    ]:
+    for key in CATEGORY_LABELS:
 
         data = QUESTION_DATA.get(
             key,
@@ -903,7 +921,30 @@ def leaderboard():
 
 
 # ============================================================
-# START QUIZ
+# TEST INSTRUCTIONS
+# ============================================================
+
+@app.route("/instructions/<category>/<path:exam>")
+@login_required
+def instructions(category, exam):
+
+    if category not in CATEGORY_LABELS:
+        abort(404)
+
+    if exam not in get_available_exams(category):
+        abort(404)
+
+    return render_template(
+        "instructions.html",
+        category=category,
+        category_label=CATEGORY_LABELS[category],
+        exam=exam,
+        total=min(len(get_playable_questions(category, exam)), QUIZ_LENGTH),
+    )
+
+
+# ============================================================
+# START TEST
 # ============================================================
 
 @app.route(
@@ -927,6 +968,9 @@ def start_quiz():
         or ""
     ).strip()
 
+    if request.form.get("agree") != "1":
+        return redirect(url_for("instructions", category=category, exam=exam))
+
     questions = get_playable_questions(
         category,
         exam
@@ -948,6 +992,12 @@ def start_quiz():
     session["q_index"] = 0
 
     session["score"] = 0
+
+    session["answers"] = {}
+
+    session["marked"] = []
+
+    session.pop("last_result", None)
 
     return redirect(
         url_for("question")
@@ -1004,60 +1054,9 @@ def question():
         )
     )
 
-    # ========================================================
-    # RESULT AFTER 10 QUESTIONS
-    # ========================================================
-
     if q_index >= quiz_length:
-
-        final_score = int(
-            session.get(
-                "score",
-                0
-            )
-        )
-
-        leaderboard_score = round(
-            final_score
-            * QUIZ_LENGTH
-            / quiz_length
-        )
-
-        save_best_score(
-            leaderboard_score
-        )
-
-        result_category = category
-
-        result_exam = exam
-
-        session.pop(
-            "category",
-            None
-        )
-
-        session.pop(
-            "exam",
-            None
-        )
-
-        session.pop(
-            "q_index",
-            None
-        )
-
-        session.pop(
-            "score",
-            None
-        )
-
-        return render_template(
-            "result.html",
-            score=final_score,
-            total=quiz_length,
-            category=result_category,
-            exam=result_exam
-        )
+        q_index = quiz_length - 1
+        session["q_index"] = q_index
 
     current_question = quiz[
         q_index
@@ -1069,47 +1068,33 @@ def question():
 
     if request.method == "POST":
 
-        selected = request.form.get(
-            "option"
-        )
+        action = request.form.get("action", "save_next")
+        selected = request.form.get("option")
+        answers = dict(session.get("answers", {}))
+        marked = set(session.get("marked", []))
 
-        timed_out = (
-            request.form.get(
-                "timed_out"
-            )
-            == "1"
-        )
+        if selected:
+            answers[str(q_index)] = selected
+        elif action == "save_next":
+            answers.pop(str(q_index), None)
 
-        correct_answer = (
-            current_question[
-                "answer"
-            ]
-        )
+        if action == "mark_review":
+            marked.add(q_index)
+        elif action == "save_next":
+            marked.discard(q_index)
 
-        if (
-            not timed_out
-            and selected is not None
-            and normalize(selected)
-            == normalize(correct_answer)
-        ):
+        session["answers"] = answers
+        session["marked"] = sorted(marked)
 
-            session["score"] = (
-                int(
-                    session.get(
-                        "score",
-                        0
-                    )
-                )
-                + 1
-            )
+        if action == "submit_test":
+            return redirect(url_for("submit_test"))
 
-        session["q_index"] = (
-            q_index + 1
-        )
+        if action == "previous":
+            session["q_index"] = max(0, q_index - 1)
+        else:
+            session["q_index"] = min(quiz_length - 1, q_index + 1)
 
-        return redirect(
-            url_for("question")
-        )
+        return redirect(url_for("question"))
 
     return render_template(
         "question.html",
@@ -1117,7 +1102,9 @@ def question():
         options=current_question["options"],
         q_number=q_index + 1,
         total=quiz_length,
-        time_limit=TIME_PER_QUESTION,
+        selected=session.get("answers", {}).get(str(q_index)),
+        marked=session.get("marked", []),
+        answered_indices=[int(key) for key in session.get("answers", {})],
         category_label=(
             CATEGORY_LABELS.get(
                 category,
@@ -1128,6 +1115,63 @@ def question():
     )
 
 
+@app.route("/question/<int:index>")
+@login_required
+def question_at(index):
+    category = session.get("category")
+    exam = session.get("exam")
+    total = min(len(get_playable_questions(category, exam)), QUIZ_LENGTH) if category and exam else 0
+    if not 0 <= index < total:
+        abort(404)
+    session["q_index"] = index
+    return redirect(url_for("question"))
+
+
+@app.route("/submit-test", methods=["GET", "POST"])
+@login_required
+def submit_test():
+    category = session.get("category")
+    exam = session.get("exam")
+    if not category or not exam:
+        return redirect(url_for("index"))
+
+    quiz = get_playable_questions(category, exam)[:QUIZ_LENGTH]
+    answers = session.get("answers", {})
+    details = []
+    correct = wrong = 0
+    for index, item in enumerate(quiz):
+        selected = answers.get(str(index))
+        is_correct = bool(selected and normalize(selected) == normalize(item["answer"]))
+        correct += int(is_correct)
+        wrong += int(bool(selected) and not is_correct)
+        details.append({
+            "number": index + 1,
+            "question": item["q"],
+            "options": item["options"],
+            "selected": selected,
+            "correct_answer": item["answer"],
+            "is_correct": is_correct,
+        })
+
+    total = len(quiz)
+    unattempted = total - correct - wrong
+    save_best_score(round(correct * QUIZ_LENGTH / total) if total else 0)
+    result_data = {
+        "score": correct,
+        "correct": correct,
+        "wrong": wrong,
+        "unattempted": unattempted,
+        "total": total,
+        "category": category,
+        "exam": exam,
+        "details": details,
+    }
+    session["last_result"] = result_data
+    for key in ("category", "exam", "q_index", "score", "answers", "marked"):
+        session.pop(key, None)
+    return redirect(url_for("result"))
+
+
 # ============================================================
 # RESULT DIRECT URL
 # ============================================================
@@ -1135,10 +1179,19 @@ def question():
 @app.route("/result")
 @login_required
 def result():
+    data = session.get("last_result")
+    if not data:
+        return redirect(url_for("index"))
+    return render_template("result.html", **data)
 
-    return redirect(
-        url_for("index")
-    )
+
+@app.route("/solutions")
+@login_required
+def solutions():
+    data = session.get("last_result")
+    if not data:
+        return redirect(url_for("index"))
+    return render_template("solutions.html", **data)
 
 
 # ============================================================
@@ -1151,7 +1204,7 @@ def health():
     return {
         "status": "ok",
         "questions_file": (
-            QUESTIONS_FILE.exists()
+            QUESTIONS_FILE.exists() or COMPRESSED_QUESTIONS_FILE.exists()
         ),
         "categories": list(
             QUESTION_DATA.keys()
@@ -1177,4 +1230,3 @@ if __name__ == "__main__":
         port=port,
         debug=False
     )
-

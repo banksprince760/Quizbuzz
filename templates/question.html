@@ -1,198 +1,38 @@
 {% extends "base.html" %}
-
-{% block title %}
-Question {{ q_number }} - QuizBuzz
-{% endblock %}
-
+{% block title %}Question {{ q_number }} - QuizBuzz{% endblock %}
 {% block content %}
-
-<div class="quiz-card">
-
-    <div class="quiz-meta">
-
-        <span>
-            {{ category_label }}
-        </span>
-
-        <span>
-            {{ exam }}
-        </span>
-
-    </div>
-
-
-    <div class="quiz-top">
-
-        <p class="progress">
-
-            Question
-            {{ q_number }}
-            /
-            {{ total }}
-
-        </p>
-
-
-        <div
-            class="timer-box"
-            id="timerBox"
-        >
-
-            ⏱️
-
-            <span id="timer">
-                {{ time_limit }}
-            </span>
-
-            sec
-
-        </div>
-
-    </div>
-
-
-    <h2 class="question-text">
-        {{ question }}
-    </h2>
-
-
-    <form
-        method="POST"
-        id="quizForm"
-    >
-
-        <input
-            type="hidden"
-            name="timed_out"
-            id="timedOut"
-            value="0"
-        >
-
-
-        <div class="options-list">
-
-            {% for option in options %}
-
-            <label class="option-label">
-
-                <input
-                    type="radio"
-                    name="option"
-                    value="{{ option }}"
-                >
-
-                <span>
-                    {{ option }}
-                </span>
-
-            </label>
-
-            {% endfor %}
-
-        </div>
-
-
-        <button
-            type="submit"
-            class="full-btn"
-            id="submitButton"
-        >
-            Submit Answer
-        </button>
-
+<div class="test-layout">
+  <section class="quiz-card">
+    <div class="quiz-meta"><span>{{ category_label }}</span><span>{{ exam }}</span></div>
+    <div class="quiz-top"><p class="progress">Question {{ q_number }} / {{ total }}</p><span class="no-timer">No timer</span></div>
+    <h2 class="question-text">{{ question }}</h2>
+    <form method="POST">
+      <div class="options-list">
+        {% for option in options %}
+        <label class="option-label">
+          <input type="radio" name="option" value="{{ option }}" {% if selected == option %}checked{% endif %}>
+          <span>{{ option }}</span>
+        </label>
+        {% endfor %}
+      </div>
+      <div class="test-actions">
+        {% if q_number > 1 %}<button name="action" value="previous" class="btn secondary-btn">← Previous</button>{% endif %}
+        <button name="action" value="mark_review" class="btn review-btn">Mark for Review</button>
+        <button name="action" value="skip" class="btn secondary-btn">Skip</button>
+        <button name="action" value="save_next" class="btn">Save & Next</button>
+        <button name="action" value="submit_test" class="btn submit-test-btn">Submit Test</button>
+      </div>
     </form>
-
+  </section>
+  <aside class="question-palette">
+    <h3>Questions</h3>
+    <div class="palette-grid">
+      {% for i in range(total) %}
+      <a href="{{ url_for('question_at', index=i) }}" class="palette-number {% if i + 1 == q_number %}current{% elif i in marked %}review{% elif i in answered_indices %}answered{% endif %}">{{ i + 1 }}</a>
+      {% endfor %}
+    </div>
+    <p><span class="legend answered"></span> Answered</p>
+    <p><span class="legend review"></span> Review</p>
+  </aside>
 </div>
-
-
-<script>
-
-let timeLeft =
-    {{ time_limit | int }};
-
-let submitted = false;
-
-const timer =
-    document.getElementById("timer");
-
-const timerBox =
-    document.getElementById("timerBox");
-
-const quizForm =
-    document.getElementById("quizForm");
-
-const timedOut =
-    document.getElementById("timedOut");
-
-const submitButton =
-    document.getElementById("submitButton");
-
-
-const countdown = setInterval(
-    function () {
-
-        timeLeft--;
-
-        timer.textContent =
-            Math.max(
-                timeLeft,
-                0
-            );
-
-        if (timeLeft <= 1) {
-
-            timerBox.classList.add(
-                "timer-danger"
-            );
-
-        }
-
-        if (
-            timeLeft <= 0
-            && !submitted
-        ) {
-
-            submitted = true;
-
-            clearInterval(
-                countdown
-            );
-
-            timedOut.value =
-                "1";
-
-            submitButton.disabled =
-                true;
-
-            quizForm.submit();
-
-        }
-
-    },
-    1000
-);
-
-
-quizForm.addEventListener(
-    "submit",
-    function () {
-
-        if (!submitted) {
-
-            submitted = true;
-
-            clearInterval(
-                countdown
-            );
-
-            submitButton.disabled =
-                true;
-
-        }
-
-    }
-);
-
-</script>
-
 {% endblock %}

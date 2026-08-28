@@ -35,36 +35,11 @@
             📝 {{ question_count }} Questions
         </p>
 
-        <p>
-            ⏱️ 3 Seconds Per Question
-        </p>
+        <p>⏱️ No question timer</p>
 
-
-        <form
-            method="POST"
-            action="{{ url_for('start_quiz') }}"
-        >
-
-            <input
-                type="hidden"
-                name="category"
-                value="{{ category }}"
-            >
-
-            <input
-                type="hidden"
-                name="exam"
-                value="{{ exam_name }}"
-            >
-
-            <button
-                type="submit"
-                class="start-btn"
-            >
-                Start Quiz
-            </button>
-
-        </form>
+        <a href="{{ url_for('instructions', category=category, exam=exam_name) }}" class="start-btn">
+            Start Test
+        </a>
 
     </div>
 
@@ -96,4 +71,3 @@
 </div>
 
 {% endblock %}
-

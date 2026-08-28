@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Solutions - QuizBuzz{% endblock %}
+{% block content %}
+<div class="hero"><h1>Solutions</h1><p>{{ exam }}</p></div>
+{% for item in details %}
+<article class="solution-card {% if item.is_correct %}solution-correct{% elif item.selected %}solution-wrong{% else %}solution-skipped{% endif %}">
+  <h3>Question {{ item.number }}</h3>
+  <p class="question-text">{{ item.question }}</p>
+  <p><strong>Your answer:</strong> {{ item.selected or "Unattempted" }}</p>
+  <p><strong>Correct answer:</strong> {{ item.correct_answer }}</p>
+</article>
+{% endfor %}
+<div class="back-area"><a href="{{ url_for('result') }}" class="btn">← Back to Result</a></div>
+{% endblock %}
