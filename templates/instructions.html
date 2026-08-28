@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Test Instructions - QuizBuzz{% endblock %}
+{% block content %}
+<div class="quiz-card">
+  <h1>{{ exam }}</h1>
+  <p class="subtitle">{{ category_label }} · {{ total }} Questions · No timer</p>
+  <h2>Test Instructions</h2>
+  <ul class="instruction-list">
+    <li>Har question ke liye ek option choose karein.</li>
+    <li><strong>Save & Next</strong> se answer record hoga.</li>
+    <li>Question chhod sakte hain ya <strong>Mark for Review</strong> kar sakte hain.</li>
+    <li>Question palette se kisi bhi question par ja sakte hain.</li>
+    <li>Test complete hone par <strong>Submit Test</strong> dabayein.</li>
+    <li>Submit ke baad score, correct, wrong, unattempted aur solutions milenge.</li>
+  </ul>
+  <form method="POST" action="{{ url_for('start_quiz') }}">
+    <input type="hidden" name="category" value="{{ category }}">
+    <input type="hidden" name="exam" value="{{ exam }}">
+    <label class="agree-row"><input type="checkbox" name="agree" value="1" required> I agree to the instructions.</label>
+    <button type="submit" class="full-btn">I am ready to begin</button>
+  </form>
+</div>
+{% endblock %}

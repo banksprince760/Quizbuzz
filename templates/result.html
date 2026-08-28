@@ -1,122 +1,23 @@
 {% extends "base.html" %}
-
-{% block title %}
-Result - QuizBuzz
-{% endblock %}
-
+{% block title %}Result - QuizBuzz{% endblock %}
 {% block content %}
-
 <div class="result-card">
-
-    <div class="result-icon">
-        🎉
-    </div>
-
-    <h1>
-        Quiz Complete!
-    </h1>
-
-    <p class="result-exam">
-        {{ exam }}
-    </p>
-
-
-    <div class="score-big">
-
-        {{ score }}
-        /
-        {{ total }}
-
-    </div>
-
-
-    {% set percentage =
-        ((score / total) * 100)
-        | round(0)
-        | int
-    %}
-
-
-    <div class="percentage">
-        {{ percentage }}%
-    </div>
-
-
-    <div class="result-stats">
-
-        <div class="correct-box">
-
-            <h3>
-                ✅ Correct
-            </h3>
-
-            <strong>
-                {{ score }}
-            </strong>
-
-        </div>
-
-
-        <div class="wrong-box">
-
-            <h3>
-                ❌ Wrong
-            </h3>
-
-            <strong>
-                {{ total - score }}
-            </strong>
-
-        </div>
-
-    </div>
-
-
-    {% if score == 10 %}
-
-    <h2>
-        🏆 Perfect Score!
-    </h2>
-
-    {% elif score >= 7 %}
-
-    <h2>
-        🌟 Excellent!
-    </h2>
-
-    {% elif score >= 5 %}
-
-    <h2>
-        👍 Good Job!
-    </h2>
-
-    {% else %}
-
-    <h2>
-        💪 Keep Practicing!
-    </h2>
-
-    {% endif %}
-
-
-    <div class="result-actions">
-
-        <a
-            href="{{ url_for('exams', category=category) }}"
-            class="btn"
-        >
-            🔄 Another Quiz
-        </a>
-
-        <a
-            href="{{ url_for('index') }}"
-            class="btn secondary-btn"
-        >
-            🏠 Home
-        </a>
-
-    </div>
-
+  <div class="result-icon">🎉</div>
+  <h1>Test Complete!</h1>
+  <p class="result-exam">{{ exam }}</p>
+  <div class="score-big">{{ score }} / {{ total }}</div>
+  {% set percentage = ((score / total) * 100)|round(0)|int if total else 0 %}
+  <div class="percentage">{{ percentage }}%</div>
+  <div class="result-stats three-stats">
+    <div class="correct-box"><h3>✅ Correct</h3><strong>{{ correct }}</strong></div>
+    <div class="wrong-box"><h3>❌ Wrong</h3><strong>{{ wrong }}</strong></div>
+    <div class="unattempted-box"><h3>➖ Unattempted</h3><strong>{{ unattempted }}</strong></div>
+  </div>
+  <p class="subtitle">Rank aur percentile tab dikhaye jayenge jab enough real participants ka verified data available hoga.</p>
+  <div class="result-actions">
+    <a href="{{ url_for('solutions') }}" class="btn">View Solutions</a>
+    <a href="{{ url_for('exams', category=category) }}" class="btn secondary-btn">Another Test</a>
+    <a href="{{ url_for('index') }}" class="btn secondary-btn">Home</a>
+  </div>
 </div>
-
 {% endblock %}
